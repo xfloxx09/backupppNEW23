@@ -1,0 +1,198 @@
+{# app/templates/admin/manage_coachings.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2>{{ title }}</h2>
+
+    {# Filter Form #}
+    <form method="GET" action="{{ url_for('admin.manage_coachings') }}" id="filterCoachingForm" class="mb-4 card card-body">
+        <div class="form-row align-items-end">
+            {# Period Filter #}
+            <div class="col-md-3 mb-2">
+                <label for="period_filter">Zeitraum:</label>
+                <select name="period" id="period_filter" class="form-control custom-select form-control-sm">
+                    <option value="all" {% if not current_period_filter or current_period_filter == 'all' %}selected{% endif %}>Alles</option>
+                    <option value="7days" {% if current_period_filter == '7days' %}selected{% endif %}>Letzte 7 Tage</option>
+                    <option value="30days" {% if current_period_filter == '30days' %}selected{% endif %}>Letzte 30 Tage</option>
+                    <option value="current_quarter" {% if current_period_filter == 'current_quarter' %}selected{% endif %}>Dieses Quartal</option>
+                    <option value="current_year" {% if current_period_filter == 'current_year' %}selected{% endif %}>Dieses Jahr</option>
+                    {% if month_options %}
+                    <optgroup label="Spezifische Monate">
+                        {% for month_opt in month_options|reverse %}
+                            <option value="{{ month_opt.value }}" {% if current_period_filter == month_opt.value %}selected{% endif %}>
+                                {{ month_opt.text }}
+                            </option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endif %}
+                </select>
+            </div>
+
+            {# Team Filter #}
+            <div class="col-md-3 mb-2">
+                <label for="team_filter">Team (Coachee):</label>
+                <select name="team" id="team_filter" class="form-control custom-select form-control-sm">
+                    <option value="all" {% if current_team_id_filter == 'all' or not current_team_id_filter.isdigit() %}selected{% endif %}>Alle Teams</option>
+                    {% for team_obj in all_teams %}
+                    <option value="{{ team_obj.id }}" {% if current_team_id_filter == team_obj.id|string %}selected{% endif %}>
+                        {{ team_obj.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Team Member Filter #}
+            <div class="col-md-3 mb-2">
+                <label for="teammember_filter">Teammitglied (Coachee):</label>
+                <select name="teammember" id="teammember_filter" class="form-control custom-select form-control-sm">
+                    <option value="all" {% if current_teammember_id_filter == 'all' or not current_teammember_id_filter.isdigit() %}selected{% endif %}>Alle Mitglieder</option>
+                    {% for member in all_team_members %} {# Assuming all_team_members contains objects with id and name #}
+                    <option value="{{ member.id }}" {% if current_teammember_id_filter == member.id|string %}selected{% endif %}>
+                        {{ member.name }} {% if member.team %}({{ member.team.name }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Coach Filter #}
+            <div class="col-md-3 mb-2">
+                <label for="coach_filter">Coach:</label>
+                <select name="coach" id="coach_filter" class="form-control custom-select form-control-sm">
+                    <option value="all" {% if current_coach_id_filter == 'all' or not current_coach_id_filter.isdigit() %}selected{% endif %}>Alle Coaches</option>
+                    {% for coach_user in all_coaches %}
+                    <option value="{{ coach_user.id }}" {% if current_coach_id_filter == coach_user.id|string %}selected{% endif %}>
+                        {{ coach_user.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row align-items-end mt-2">
+            {# Search Filter #}
+            <div class="col-md-9 mb-2">
+                <label for="search_filter">Freitextsuche:</label>
+                <input type="text" name="search" id="search_filter" class="form-control form-control-sm" placeholder="Suche in Thema, Notizen, TCAP ID..." value="{{ current_search_term or '' }}">
+            </div>
+            <div class="col-md-3 mb-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-sm btn-block">Filter Anwenden</button>
+                <a href="{{ url_for('admin.manage_coachings') }}" class="btn btn-secondary btn-sm ml-2" title="Filter zurücksetzen"><i class="fas fa-times"></i> Reset</a>
+            </div>
+        </div>
+    </form>
+
+    {# Form for Bulk Actions #}
+    <form method="POST" action="{{ url_for('admin.manage_coachings', page=coachings_paginated.page, period=current_period_filter, team=current_team_id_filter, teammember=current_teammember_id_filter, coach=current_coach_id_filter, search=current_search_term) }}" id="bulkActionForm">
+        {{ csrf_token if csrf_token else '' }} {# Add CSRF token if you're using Flask-WTF/CSRFProtect globally #}
+        
+        <div class="mb-3">
+            {% if coachings_paginated.items %}
+            <button type="submit" name="delete_selected" class="btn btn-danger btn-sm" onclick="return confirm('Sind Sie sicher, dass Sie die ausgewählten Coachings löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.');">
+                <i class="fas fa-trash-alt"></i> Ausgewählte löschen
+            </button>
+            {% endif %}
+        </div>
+
+        {% if coachings_paginated.items %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm">
+                <thead class="thead-dark">
+                    <tr>
+                        <th><input type="checkbox" id="selectAllCheckbox"></th>
+                        <th>Datum</th>
+                        <th>Teammitglied</th>
+                        <th>Team</th>
+                        <th>Coach</th>
+                        <th>Thema</th>
+                        <th>Stil</th>
+                        <th>Score (%)</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for coaching in coachings_paginated.items %}
+                    <tr>
+                        <td><input type="checkbox" name="coaching_ids" value="{{ coaching.id }}" class="coaching-checkbox"></td>
+                        <td>{{ coaching.coaching_date|athens_time('%d.%m.%y %H:%M') }}</td>
+                        <td>{{ coaching.team_member_coached.name if coaching.team_member_coached else 'N/A' }}</td>
+                        <td>{{ coaching.team_member_coached.team.name if coaching.team_member_coached and coaching.team_member_coached.team else 'N/A' }}</td>
+                        <td>{{ coaching.coach.username if coaching.coach else 'N/A' }}</td>
+                        <td>{{ coaching.coaching_subject|truncate(30, True) if coaching.coaching_subject else '-' }}</td>
+                        <td>{{ coaching.coaching_style if coaching.coaching_style else '-' }}</td>
+                        <td>{{ coaching.overall_score }}%</td>
+                        <td>
+                            {# Link to an edit page - you'll need to create this route/template #}
+                            <a href="{{ url_for('admin.edit_coaching_entry', coaching_id=coaching.id) }}" class="btn btn-info btn-xs mr-1" title="Bearbeiten"><i class="fas fa-edit"></i></a>
+                             <a href="#" class="btn btn-danger btn-xs" title="Einzeln löschen" onclick="event.preventDefault(); if(confirm('Dieses Coaching wirklich löschen?')) { document.getElementById('delete-coaching-{{ coaching.id }}-form').submit(); }"><i class="fas fa-trash-alt"></i></a>
+                        </td>
+                    </tr>
+                    {# Hidden form for single delete #}
+                    <form id="delete-coaching-{{ coaching.id }}-form" action="{{ url_for('admin.delete_coaching_entry', coaching_id=coaching.id) }}" method="POST" style="display: none;">
+                        {{ csrf_token if csrf_token else '' }}
+                    </form>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Pagination #}
+        <nav aria-label="Coaching Management Navigation">
+            <ul class="pagination justify-content-center">
+                {% if coachings_paginated.has_prev %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('admin.manage_coachings', page=coachings_paginated.prev_num, period=current_period_filter, team=current_team_id_filter, teammember=current_teammember_id_filter, coach=current_coach_id_filter, search=current_search_term) }}">Vorherige</a></li>
+                {% endif %}
+                {% for page_num in coachings_paginated.iter_pages() %}
+                    {% if page_num %}
+                        <li class="page-item {% if coachings_paginated.page == page_num %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('admin.manage_coachings', page=page_num, period=current_period_filter, team=current_team_id_filter, teammember=current_teammember_id_filter, coach=current_coach_id_filter, search=current_search_term) }}">{{ page_num }}</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                {% if coachings_paginated.has_next %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('admin.manage_coachings', page=coachings_paginated.next_num, period=current_period_filter, team=current_team_id_filter, teammember=current_teammember_id_filter, coach=current_coach_id_filter, search=current_search_term) }}">Nächste</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% else %}
+        <p class="text-center">Keine Coachings gefunden, die den Filtern entsprechen.</p>
+        {% endif %}
+    </form> {# End of bulkActionForm #}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const coachingCheckboxes = document.querySelectorAll('.coaching-checkbox');
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            coachingCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+        });
+    }
+
+    coachingCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (!this.checked) {
+                selectAllCheckbox.checked = false;
+            } else {
+                // Check if all are checked
+                let allChecked = true;
+                coachingCheckboxes.forEach(cb => {
+                    if (!cb.checked) {
+                        allChecked = false;
+                    }
+                });
+                selectAllCheckbox.checked = allChecked;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

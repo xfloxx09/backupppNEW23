@@ -1,0 +1,610 @@
+{# app/templates/main/index.html - Coaching Dashboard #}
+{% extends "base.html" %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+.detail-card {
+    background-color: #333;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 10px;
+}
+.detail-section {
+    margin-bottom: 20px;
+}
+.detail-section-title {
+    color: #e20074;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+.detail-item {
+    background-color: #2b2b2b;
+    padding: 8px 12px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.detail-item strong {
+    color: #aaa;
+    font-weight: normal;
+    margin-right: 10px;
+}
+.detail-item span {
+    color: #fff;
+    font-weight: 500;
+}
+.badge-leitfaden {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-right: 5px;
+}
+.badge-ja {
+    background-color: #28a745;
+    color: white;
+}
+.badge-nein {
+    background-color: #dc3545;
+    color: white;
+}
+.badge-ka {
+    background-color: #6c757d;
+    color: white;
+}
+.leitfaden-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.notes-box {
+    background-color: #2b2b2b;
+    border-left: 3px solid #e20074;
+    padding: 15px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    font-style: italic;
+    color: #ddd;
+    margin-top: 10px;
+}
+.btn-icon-circle {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    border: 1px solid #aaa;
+    color: #aaa;
+    transition: all 0.2s;
+}
+.btn-icon-circle:hover {
+    background-color: #e20074;
+    border-color: #e20074;
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<h2>{{ title }}</h2>
+
+<form method="GET" action="{{ url_for('main.coaching_dashboard') }}" id="filterForm" class="mb-4">
+    <div class="form-row align-items-end">
+        <div class="col-md-auto">
+            <div class="form-group mr-2">
+                <label for="period_filter" class="mr-2">Zeitraum:</label>
+                <select name="period" id="period_filter" class="form-control custom-select form-control-sm">
+                    <option value="all" {% if not current_period_filter or current_period_filter == 'all' %}selected{% endif %}>Alles</option>
+                    <option value="7days" {% if current_period_filter == '7days' %}selected{% endif %}>Letzte 7 Tage</option>
+                    <option value="30days" {% if current_period_filter == '30days' %}selected{% endif %}>Letzte 30 Tage</option>
+                    <option value="current_quarter" {% if current_period_filter == 'current_quarter' %}selected{% endif %}>Dieses Quartal</option>
+                    <option value="current_year" {% if current_period_filter == 'current_year' %}selected{% endif %}>Dieses Jahr</option>
+                    {% if month_options %}
+                    <optgroup label="📅 Monate">
+                        {% for month in month_options %}
+                        <option value="{{ month.value }}" {% if current_period_filter == month.value %}selected{% endif %}>
+                            {{ month.text }} ({{ month.count }})
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endif %}
+                </select>
+            </div>
+        </div>
+
+        {# Project filter – only show if user has access to multiple projects #}
+        {% if all_projects and all_projects|length > 0 %}
+        <div class="col-md-auto">
+            <div class="form-group mr-2">
+                <label for="project_filter" class="mr-2">Projekt:</label>
+                <select name="project" id="project_filter" class="form-control custom-select form-control-sm">
+                    <option value="" {% if not current_project_filter %}selected{% endif %}>-- Alle Projekte --</option>
+                    {% for p in all_projects %}
+                        <option value="{{ p.id }}" {% if current_project_filter == p.id %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="col-md-auto">
+            <div class="form-group mr-2">
+                <label for="team_filter" class="mr-2">Team:</label>
+                <select name="team" id="team_filter" class="form-control custom-select form-control-sm">
+                    <option value="all" {% if current_team_id_filter == 'all' or not current_team_id_filter %}selected{% endif %}>Alle Teams</option>
+                    {% for team_obj in all_teams_for_filter %}
+                    <option value="{{ team_obj.id }}" {% if current_team_id_filter == team_obj.id|string %}selected{% endif %}>
+                        {{ team_obj.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% if current_search_term %}
+        <input type="hidden" name="search" value="{{ current_search_term }}">
+        {% endif %}
+        <div class="col-md-auto">
+            <div class="form-group">
+                <button type="submit" class="btn telekom-button btn-sm">Filter anwenden</button>
+            </div>
+        </div>
+        <div class="col-md-auto">
+            <div class="form-group">
+                <a href="{{ url_for('main.coaching_dashboard') }}" class="btn btn-secondary btn-sm">Filter zurücksetzen</a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card text-white telekom-bg-magenta info-box h-100">
+            <div class="card-body text-center d-flex flex-column justify-content-center">
+                <h5 class="card-title">Coaching Sessions (Gesamt)</h5>
+                <p class="card-text display-4">{{ global_total_coachings_count }}</p>
+                <small>(im ausgewählten Zeitraum)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card text-white telekom-bg-magenta info-box h-100">
+            <div class="card-body text-center d-flex flex-column justify-content-center">
+                <h5 class="card-title">Stunden gecoacht (Gesamt)</h5>
+                <p class="card-text display-4">{{ global_time_coached_display.split('(')[0].strip() if global_time_coached_display else '0 Std. 0 Min.' }}</p>
+                <small>({{ global_time_coached_display.split('(')[1].split(')')[0] if global_time_coached_display and '(' in global_time_coached_display else '0 Min.' }} gesamt)</small>
+            </div>
+        </div>
+    </div>
+</div>
+<hr>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header telekom-bg-magenta text-white">Ø Performance / Team (%)</div>
+            <div class="card-body d-flex align-items-center justify-content-center p-2">
+                <canvas id="avgPerfByTeamChart" style="max-height: 300px; width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header telekom-bg-magenta text-white">Gesamte Coaching-Dauer / Team (Min.)</div>
+            <div class="card-body d-flex align-items-center justify-content-center p-2">
+                <canvas id="timeSpentChart" style="max-height: 300px; width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-0 mt-md-4">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header telekom-bg-magenta text-white">Anzahl Coachings / Team</div>
+            <div class="card-body d-flex align-items-center justify-content-center p-2">
+                <canvas id="coachingsDoneByTeamChart" style="max-height: 300px; width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header telekom-bg-magenta text-white">Coaching-Themen</div>
+            <div class="card-body d-flex align-items-center justify-content-center p-2">
+                <canvas id="subjectDistributionChart" style="max-height: 300px; width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+<hr class="mt-0">
+
+<div class="row mt-3 mb-2 align-items-center">
+    <div class="col-md-7 col-lg-8">
+        <h3 class="mb-0">Coaching Liste (Angezeigt: {{ coachings_paginated.items|length if coachings_paginated and coachings_paginated.items else 0 }}, Gesamt gefiltert: {{ total_coachings if total_coachings is not none else 0 }})</h3>
+    </div>
+    <div class="col-md-5 col-lg-4">
+        <form method="GET" action="{{ url_for('main.coaching_dashboard') }}" class="form-inline float-md-right w-100" id="searchFormInTitle">
+            <input type="hidden" name="period" value="{{ current_period_filter }}">
+            <input type="hidden" name="team" value="{{ current_team_id_filter }}">
+            <div class="input-group w-100">
+                <input type="text" name="search" class="form-control form-control-sm" placeholder="Suchen (Name, Coach, Thema...)" value="{{ current_search_term or '' }}" aria-label="Suchbegriff für Coachings">
+                <div class="input-group-append">
+                    <button type="submit" class="btn telekom-button btn-sm">Suchen</button>
+                    {% if current_search_term %}
+                    <a href="{{ url_for('main.coaching_dashboard', period=current_period_filter, team=current_team_id_filter) }}" class="btn btn-outline-secondary btn-sm" title="Suche zurücksetzen">×</a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if coachings_paginated and coachings_paginated.items %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="telekom-bg-magenta text-white">
+            <tr>
+                <th>Datum</th>
+                <th>Teammitglied</th>
+                <th>Team</th>
+                <th>Coach</th>
+                <th>Thema</th>
+                <th>Stil</th>
+                <th>Note</th>
+                <th>Min.</th>
+                <th>Score (%)</th>
+                <th>Notiz</th>
+                <th>Details</th>
+                <th>Bearbeiten</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for coaching in coachings_paginated.items %}
+            <tr>
+                <td>{{ coaching.coaching_date|athens_time }}</td>
+                <td>{{ coaching.team_member_coached.name if coaching.team_member_coached else 'N/A' }}</td>
+                <td>{{ coaching.team_member_coached.team.name if coaching.team_member_coached and coaching.team_member_coached.team else 'N/A' }}</td>
+                <td>{{ coaching.coach.username if coaching.coach else 'N/A' }}</td>
+                <td>{{ coaching.coaching_subject if coaching.coaching_subject else '-' }}</td>
+                <td>{{ coaching.coaching_style if coaching.coaching_style else '-' }}</td>
+                <td>{{ coaching.performance_mark if coaching.performance_mark is not none else '-'}}</td>
+                <td>{{ coaching.time_spent if coaching.time_spent is not none else '-' }}</td>
+                <td>
+                    <div class="progress" style="min-width: 100px;">
+                        <div class="progress-bar telekom-progress-bar" role="progressbar" style="width: {{ coaching.overall_score }}%;" aria-valuenow="{{ coaching.overall_score }}" aria-valuemin="0" aria-valuemax="100">
+                            {{ coaching.overall_score }}%
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    {% if coaching.project_leader_notes %}
+                        {{ coaching.project_leader_notes[:30] }}{% if coaching.project_leader_notes|length > 30 %}...{% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="btn-icon-circle" type="button" data-toggle="collapse" data-target="#coachingDetails{{ coaching.id }}" aria-expanded="false" aria-controls="coachingDetails{{ coaching.id }}" title="Details anzeigen">
+                        <i class="fas fa-info"></i>
+                    </button>
+                </td>
+                <td>
+                    {% if current_user.id == coaching.coach_id or current_user.role == config.ROLE_ADMIN %}
+                    <a href="{{ url_for('main.edit_coaching', coaching_id=coaching.id, next=request.url) }}" class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr class="collapse" id="coachingDetails{{ coaching.id }}">
+                <td colspan="12">
+                    <div class="detail-card">
+                        <div class="detail-section">
+                            <div class="detail-section-title">Basis-Informationen</div>
+                            <div class="detail-grid">
+                                <div class="detail-item"><strong>Stil:</strong> <span>{{ coaching.coaching_style if coaching.coaching_style else '-'}}</span></div>
+                                {% if coaching.coaching_style == 'TCAP' and coaching.tcap_id %}
+                                <div class="detail-item"><strong>T-CAP ID:</strong> <span>{{ coaching.tcap_id }}</span></div>
+                                {% endif %}
+                                <div class="detail-item"><strong>Thema:</strong> <span>{{ coaching.coaching_subject if coaching.coaching_subject else '-' }}</span></div>
+                                <div class="detail-item"><strong>Performance Note:</strong> <span>{{ coaching.performance_mark }}/10</span></div>
+                                <div class="detail-item"><strong>Zeitaufwand:</strong> <span>{{ coaching.time_spent }} Min.</span></div>
+                                <div class="detail-item"><strong>Leitfaden Erfüllung:</strong> <span>{{ coaching.leitfaden_erfuellung_display }}</span></div>
+                            </div>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-section-title">Leitfaden-Checkmarks</div>
+                            <div class="leitfaden-list">
+                                {% for name, value in coaching.leitfaden_fields_list %}
+                                    {% if value == 'Ja' %}
+                                    <span class="badge-leitfaden badge-ja">{{ name }}: ✓</span>
+                                    {% elif value == 'Nein' %}
+                                    <span class="badge-leitfaden badge-nein">{{ name }}: ✗</span>
+                                    {% else %}
+                                    <span class="badge-leitfaden badge-ka">{{ name }}: ?</span>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% if coaching.coach_notes %}
+                        <div class="detail-section">
+                            <div class="detail-section-title">Notizen des Coaches</div>
+                            <div class="notes-box">{{ coaching.coach_notes }}</div>
+                        </div>
+                        {% endif %}
+                        {% if coaching.project_leader_notes %}
+                        <div class="detail-section">
+                            <div class="detail-section-title">PL/QM Notiz</div>
+                            <div class="notes-box">{{ coaching.project_leader_notes }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<nav aria-label="Coaching Navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if coachings_paginated.has_prev %}
+        <li class="page-item"><a class="page-link telekom-page-link" href="{{ url_for('main.coaching_dashboard', page=coachings_paginated.prev_num, period=current_period_filter, team=current_team_id_filter, search=current_search_term) }}">Vorherige</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Vorherige</span></li>
+        {% endif %}
+        {% for page_num in coachings_paginated.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+            {% if page_num %}
+                {% if coachings_paginated.page == page_num %}
+                <li class="page-item active"><span class="page-link telekom-page-active">{{ page_num }}</span></li>
+                {% else %}
+                <li class="page-item"><a class="page-link telekom-page-link" href="{{ url_for('main.coaching_dashboard', page=page_num, period=current_period_filter, team=current_team_id_filter, search=current_search_term) }}">{{ page_num }}</a></li>
+                {% endif %}
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+        {% endfor %}
+        {% if coachings_paginated.has_next %}
+        <li class="page-item"><a class="page-link telekom-page-link" href="{{ url_for('main.coaching_dashboard', page=coachings_paginated.next_num, period=current_period_filter, team=current_team_id_filter, search=current_search_term) }}">Nächste</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Nächste</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% else %}
+<p class="text-center mt-3">Keine Coachings gefunden, die den aktuellen Filtern entsprechen.</p>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof ChartDataLabels !== 'undefined') { Chart.register(ChartDataLabels); }
+    else { console.warn("ChartDataLabels Plugin wurde nicht geladen."); }
+    if (typeof ChartAnnotation !== 'undefined') { Chart.register(ChartAnnotation); }
+    else { console.warn("ChartAnnotation Plugin wurde nicht geladen."); }
+
+    const chartAvgPerformanceCtx = document.getElementById('avgPerfByTeamChart');
+    const timeSpentChartCtx = document.getElementById('timeSpentChart');
+    const chartCoachingsDoneCtx = document.getElementById('coachingsDoneByTeamChart');
+    const subjectDistributionCtx = document.getElementById('subjectDistributionChart');
+
+    const chartLabels = {{ chart_labels|tojson|safe }};
+    const chartAvgPerformanceData = {{ chart_avg_performance_mark_percentage|tojson|safe }};
+    const chartTotalTimeData = {{ chart_total_time_spent|tojson|safe }};
+    const chartCoachingsDoneData = {{ chart_coachings_done|tojson|safe }};
+    const subjectChartLabels = {{ subject_chart_labels|tojson|safe }};
+    const subjectChartValues = {{ subject_chart_values|tojson|safe }};
+
+    const telekomMagenta = 'rgba(226, 0, 116, 0.7)';
+    const telekomMagentaBorder = 'rgba(226, 0, 116, 1)';
+    const telekomDarkGreen = 'rgba(0, 100, 0, 1)';
+    const pieColors = ['rgba(226,0,116,0.7)','rgba(0,169,224,0.7)','rgba(100,100,100,0.7)','rgba(150,150,150,0.7)','rgba(255,140,0,0.7)','rgba(75,192,192,0.7)','rgba(255,99,132,0.7)','rgba(54,162,235,0.7)','rgba(255,206,86,0.7)','rgba(153,102,255,0.7)'];
+    const textColor = '#f0f0f0';
+    const dataLabelColor = '#ffffff';
+
+    function drawChartWithMessage(ctx, config, message = "Keine Daten für dieses Chart verfügbar.") {
+        let hasData = false;
+        if (config.data.labels && config.data.labels.length > 0) {
+            if ((config.type === 'pie' || config.type === 'doughnut') && config.data.datasets && config.data.datasets.length > 0 && config.data.datasets[0].data && config.data.datasets[0].data.length > 0 && config.data.datasets[0].data.some(d => d > 0)) { hasData = true; }
+            else if (config.data.datasets && config.data.datasets.length > 0 && config.data.datasets[0].data && config.data.datasets[0].data.length > 0 && config.data.datasets[0].data.some(d => d !== null && d !== undefined && !isNaN(d))) { hasData = true; }
+        }
+        if (ctx && hasData) { try { new Chart(ctx, config); } catch (e) { console.error("Chart.js Error for canvas ID '" + ctx.id + "':", e); const c = ctx.getContext('2d'); c.font = "16px Arial"; c.fillStyle = textColor; c.textAlign = "center"; c.fillText("Fehler Chart.", ctx.canvas.width / 2, ctx.canvas.height / 2); }
+        } else if (ctx) { const c = ctx.getContext('2d'); c.font = "16px Arial"; c.fillStyle = textColor; c.textAlign = "center"; c.fillText(message, ctx.canvas.width / 2, ctx.canvas.height / 2); }
+    }
+
+    const commonChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { color: textColor, precision: 0 }
+            },
+            x: {
+                ticks: { color: textColor }
+            }
+        },
+        plugins: {
+            legend: { display: false },
+            datalabels: {
+                anchor: 'end',
+                align: 'end',
+                color: dataLabelColor,
+                font: { weight: 'bold' },
+                formatter: Math.round
+            }
+        }
+    };
+
+    drawChartWithMessage(chartAvgPerformanceCtx, {
+        type: 'bar',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'Performance',
+                data: chartAvgPerformanceData,
+                backgroundColor: telekomMagenta,
+                borderColor: telekomMagentaBorder,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...commonChartOptions,
+            scales: {
+                ...commonChartOptions.scales,
+                y: {
+                    ...commonChartOptions.scales.y,
+                    min:0,
+                    max: 105,
+                    ticks: {
+                        ...commonChartOptions.scales.y.ticks,
+                        stepSize: 10,
+                        callback: function(value) { if (value <= 100) { return value + "%";} return '';}
+                    }
+                }
+            },
+            plugins: {
+                ...commonChartOptions.plugins,
+                datalabels: {
+                    ...commonChartOptions.plugins.datalabels,
+                    formatter: (value) => Math.round(value) + '%'
+                },
+                annotation: {
+                    annotations: {
+                        line1: {
+                            type: 'line',
+                            yMin: {{ config.PERFORMANCE_BENCHMARK or 80 }},
+                            yMax: {{ config.PERFORMANCE_BENCHMARK or 80 }},
+                            borderColor: telekomDarkGreen,
+                            borderWidth: 2,
+                            borderDash: [6, 6],
+                            label: {
+                                content: 'Benchmark ({{ config.PERFORMANCE_BENCHMARK or 80 }}%)',
+                                enabled: false,
+                                position: 'end',
+                                backgroundColor: 'rgba(0,100,0,0.7)',
+                                color: 'white',
+                                font: {size: 10}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    drawChartWithMessage(timeSpentChartCtx, {
+        type: 'bar',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'Gesamtdauer (Min.)',
+                data: chartTotalTimeData,
+                backgroundColor: telekomMagenta,
+                borderColor: telekomMagentaBorder,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...commonChartOptions,
+            scales: {
+                ...commonChartOptions.scales,
+                y: {
+                    ...commonChartOptions.scales.y,
+                    max: chartTotalTimeData.length > 0 ? Math.ceil(Math.max(...chartTotalTimeData) * 1.2) + 5 : 30
+                }
+            },
+            plugins: {
+                ...commonChartOptions.plugins,
+                datalabels: {
+                    ...commonChartOptions.plugins.datalabels,
+                    formatter: (value) => Math.round(value) + ' Min'
+                }
+            }
+        }
+    });
+
+    drawChartWithMessage(chartCoachingsDoneCtx, {
+        type: 'bar',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'Anzahl',
+                data: chartCoachingsDoneData,
+                backgroundColor: telekomMagenta,
+                borderColor: telekomMagentaBorder,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...commonChartOptions,
+            scales: {
+                ...commonChartOptions.scales,
+                y: {
+                    ...commonChartOptions.scales.y,
+                    ticks: { ...commonChartOptions.scales.y.ticks, stepSize: 1, precision: 0 },
+                    max: chartCoachingsDoneData.length > 0 ? Math.ceil(Math.max(...chartCoachingsDoneData) * 1.2) + 1 : 5
+                }
+            }
+        }
+    });
+
+    drawChartWithMessage(subjectDistributionCtx, {
+        type: 'pie',
+        data: {
+            labels: subjectChartLabels,
+            datasets: [{
+                label: 'Coaching-Themen',
+                data: subjectChartValues,
+                backgroundColor: pieColors.slice(0, subjectChartLabels.length),
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: { color: textColor }
+                },
+                datalabels: {
+                    formatter: (value, ctx) => {
+                        let sum = 0;
+                        let dataArr = ctx.chart.data.datasets[0].data;
+                        dataArr.map(data => { sum += data; });
+                        if (sum === 0) return '0%';
+                        let percentage = (value*100 / sum);
+                        if (percentage < 5 && ctx.chart.data.datasets[0].data.length > 3) return '';
+                        return ctx.chart.data.labels[ctx.dataIndex] + ' ' + percentage.toFixed(1)+"%";
+                    },
+                    color: '#fff',
+                    align: 'center',
+                    textAlign: 'center',
+                    font: {size: 10, weight: 'bold'}
+                }
+            }
+        }
+    }, "Keine Daten für Themenverteilung verfügbar.");
+});
+</script>
+{% endblock %}

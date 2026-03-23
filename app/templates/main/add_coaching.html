@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+<style>
+    /* Eigene Stile für das Formular */
+    .form-section {
+        background-color: #2b2b2b;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 25px;
+        border: 1px solid #444;
+    }
+    .section-title {
+        color: #e20074;
+        border-bottom: 2px solid #e20074;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+        font-weight: 600;
+        font-size: 1.3rem;
+    }
+    .section-title i {
+        margin-right: 10px;
+    }
+    .rating-slider {
+        width: 100%;
+        margin: 10px 0;
+    }
+    .rating-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #e20074;
+        text-align: center;
+        margin-top: 5px;
+    }
+    .rating-value span {
+        font-size: 1rem;
+        color: #aaa;
+    }
+    .leitfaden-item {
+        background-color: #333;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .leitfaden-label {
+        font-weight: 500;
+        color: #ddd;
+        margin-bottom: 0;
+    }
+    .leitfaden-buttons {
+        display: flex;
+        gap: 8px;
+    }
+    .leitfaden-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .leitfaden-btn.ja {
+        background-color: #28a745;
+        color: white;
+    }
+    .leitfaden-btn.ja.active {
+        background-color: #1e7e34;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7), 0 0 15px #28a745;
+        transform: scale(1.15);
+        border: 2px solid white;
+    }
+    .leitfaden-btn.nein {
+        background-color: #dc3545;
+        color: white;
+    }
+    .leitfaden-btn.nein.active {
+        background-color: #bd2130;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7), 0 0 15px #dc3545;
+        transform: scale(1.15);
+        border: 2px solid white;
+    }
+    .leitfaden-btn.ka {
+        background-color: #6c757d;
+        color: white;
+    }
+    .leitfaden-btn.ka.active {
+        background-color: #545b62;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7), 0 0 15px #6c757d;
+        transform: scale(1.15);
+        border: 2px solid white;
+    }
+    .leitfaden-btn:hover {
+        transform: scale(1.1);
+    }
+    /* Ursprüngliche Select-Felder ausblenden */
+    .leitfaden-select {
+        display: none;
+    }
+    /* Schieberegler Design */
+    input[type=range] {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 8px;
+        background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+        border-radius: 5px;
+        outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 22px;
+        height: 22px;
+        background: #e20074;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        border: 2px solid white;
+    }
+    input[type=range]::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        background: #e20074;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        border: 2px solid white;
+    }
+    .time-spent-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    .time-spent-wrapper input {
+        flex: 1;
+    }
+    .time-spent-unit {
+        font-size: 1.1rem;
+        color: #aaa;
+        min-width: 60px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4"><i class="fas fa-chalkboard-teacher"></i> {{ title }}</h2>
+
+    <form method="POST" action="{% if is_edit_mode %}{{ url_for('main.edit_coaching', coaching_id=coaching.id, next=request.args.get('next')) }}{% else %}{{ url_for('main.add_coaching') }}{% endif %}" novalidate>
+        {{ form.hidden_tag() }}
+
+        <!-- Abschnitt 1: Teammitglied & Coaching-Art -->
+        <div class="form-section">
+            <h4 class="section-title"><i class="fas fa-user"></i> Teammitglied & Coaching-Art</h4>
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    {{ form.team_member_id.label(class="form-control-label") }}
+                    <select name="team_member_id" id="team_member_id" class="form-control custom-select" required>
+                        <option value="">-- Bitte wählen --</option>
+                        {% set grouped_choices = {} %}
+                        {% for value, label in form.team_member_id.choices %}
+                            {% set team_name = label.split('(')[-1].rstrip(')') if '(' in label else '' %}
+                            {% set member_name = label.split(' (')[0] %}
+                            {% if team_name not in grouped_choices %}
+                                {% set _ = grouped_choices.update({team_name: []}) %}
+                            {% endif %}
+                            {% set _ = grouped_choices[team_name].append((value, member_name)) %}
+                        {% endfor %}
+                        {% for team_name, members in grouped_choices.items() %}
+                            <optgroup label="{{ team_name }}">
+                                {% for value, member_name in members %}
+                                    <option value="{{ value }}" {% if form.team_member_id.data == value %}selected{% endif %}>{{ member_name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endfor %}
+                    </select>
+                    {% if form.team_member_id.errors %}
+                        <div class="invalid-feedback d-block">{% for error in form.team_member_id.errors %}{{ error }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+                <div class="form-group col-md-4">
+                    {{ form.coaching_style.label(class="form-control-label") }}
+                    {{ form.coaching_style(class="form-control custom-select " + ("is-invalid" if form.coaching_style.errors else "")) }}
+                    {% if form.coaching_style.errors %}
+                        <div class="invalid-feedback">{% for error in form.coaching_style.errors %}{{ error }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+                <div class="form-group col-md-4">
+                    {{ form.coaching_subject.label(class="form-control-label") }}
+                    {{ form.coaching_subject(class="form-control custom-select " + ("is-invalid" if form.coaching_subject.errors else "")) }}
+                    {% if form.coaching_subject.errors %}
+                        <div class="invalid-feedback">{% for error in form.coaching_subject.errors %}{{ error }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="form-group" id="tcap_id_field" {% if not (form.coaching_style.data == 'TCAP' or (coaching and coaching.coaching_style == 'TCAP')) %}style="display: none;"{% endif %}>
+                {{ form.tcap_id.label(class="form-control-label") }}
+                {{ form.tcap_id(class="form-control " + ("is-invalid" if form.tcap_id.errors else "")) }}
+                {% if form.tcap_id.errors %}
+                    <div class="invalid-feedback">{% for error in form.tcap_id.errors %}{{ error }}{% endfor %}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Abschnitt 2: Leitfaden-Checkliste -->
+        <div class="form-section">
+            <h4 class="section-title"><i class="fas fa-check-circle"></i> Leitfaden-Checkliste</h4>
+            <p class="text-muted mb-3">Klicken Sie auf die entsprechenden Icons, um den Status festzulegen.</p>
+
+            {% for field in [form.leitfaden_begruessung, form.leitfaden_legitimation, form.leitfaden_pka, form.leitfaden_kek, form.leitfaden_angebot, form.leitfaden_zusammenfassung, form.leitfaden_kzb] %}
+                <div class="leitfaden-item">
+                    <span class="leitfaden-label">{{ field.label.text }}</span>
+                    <div class="leitfaden-buttons">
+                        <button type="button" class="leitfaden-btn ja" data-field="{{ field.id }}" data-value="Ja" title="Ja"><i class="fas fa-check"></i></button>
+                        <button type="button" class="leitfaden-btn nein" data-field="{{ field.id }}" data-value="Nein" title="Nein"><i class="fas fa-times"></i></button>
+                        <button type="button" class="leitfaden-btn ka" data-field="{{ field.id }}" data-value="k.A." title="k.A."><i class="fas fa-question"></i></button>
+                    </div>
+                    {{ field(class="leitfaden-select") }}
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Abschnitt 3: Bewertung & Zeitaufwand -->
+        <div class="form-section">
+            <h4 class="section-title"><i class="fas fa-star"></i> Bewertung & Zeitaufwand</h4>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    {{ form.performance_mark.label(class="form-control-label") }}
+                    <input type="range" id="performance_slider" class="rating-slider" min="0" max="10" step="1" value="{{ form.performance_mark.data or 5 }}">
+                    <div class="rating-value"><span id="performance_display">{{ form.performance_mark.data or 5 }}</span> / 10</div>
+                    {{ form.performance_mark(class="form-control d-none", id="performance_mark_hidden") }}
+                    {% if form.performance_mark.errors %}
+                        <div class="invalid-feedback d-block">{% for error in form.performance_mark.errors %}{{ error }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+                <div class="form-group col-md-6">
+                    {{ form.time_spent.label(class="form-control-label") }}
+                    <div class="time-spent-wrapper">
+                        {{ form.time_spent(class="form-control " + ("is-invalid" if form.time_spent.errors else ""), id="time_spent_input") }}
+                        <span class="time-spent-unit">Minuten</span>
+                    </div>
+                    {% if form.time_spent.errors %}
+                        <div class="invalid-feedback d-block">{% for error in form.time_spent.errors %}{{ error }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Abschnitt 4: Notizen -->
+        <div class="form-section">
+            <h4 class="section-title"><i class="fas fa-pen"></i> Notizen</h4>
+            <div class="form-group">
+                {{ form.coach_notes.label(class="form-control-label") }}
+                {{ form.coach_notes(class="form-control " + ("is-invalid" if form.coach_notes.errors else ""), rows=5, placeholder="Hier können Sie weitere Anmerkungen zum Coaching festhalten...") }}
+                {% if form.coach_notes.errors %}
+                    <div class="invalid-feedback">{% for error in form.coach_notes.errors %}{{ error }}{% endfor %}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="form-group text-center">
+            <button type="submit" class="btn telekom-button btn-lg px-5">
+                <i class="fas fa-save"></i> {% if is_edit_mode %}Coaching aktualisieren{% else %}Coaching speichern{% endif %}
+            </button>
+            <a href="{{ request.args.get('next') or url_for('main.index') }}" class="btn btn-secondary btn-lg ml-3 px-5">
+                <i class="fas fa-times"></i> Abbrechen
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- 1. TCAP-Feld umschalten ---
+    const styleSelect = document.getElementById('coaching_style');
+    const tcapField = document.getElementById('tcap_id_field');
+    const tcapInput = document.getElementById('tcap_id');
+    if (styleSelect && tcapField && tcapInput) {
+        function toggleTcap() {
+            if (styleSelect.value === 'TCAP') {
+                tcapField.style.display = '';
+                tcapInput.required = true;
+            } else {
+                tcapField.style.display = 'none';
+                tcapInput.required = false;
+                tcapInput.value = '';
+            }
+        }
+        styleSelect.addEventListener('change', toggleTcap);
+        toggleTcap();
+    }
+
+    // --- 2. Leitfaden-Icons ---
+    const leitfadenButtons = document.querySelectorAll('.leitfaden-btn');
+    leitfadenButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const fieldId = this.dataset.field;
+            const value = this.dataset.value;
+            const select = document.getElementById(fieldId);
+            if (select) {
+                select.value = value;
+                // Alle Buttons dieser Gruppe deaktivieren
+                const parentDiv = this.closest('.leitfaden-buttons');
+                parentDiv.querySelectorAll('.leitfaden-btn').forEach(b => b.classList.remove('active'));
+                // Aktiven Button markieren
+                this.classList.add('active');
+                
+                // Kurzer visueller Feedback-Effekt (optional)
+                this.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    this.style.transform = '';
+                }, 150);
+            }
+        });
+    });
+
+    // Initial aktive Buttons setzen basierend auf vorhandenen Werten
+    document.querySelectorAll('.leitfaden-select').forEach(select => {
+        const fieldId = select.id;
+        const value = select.value;
+        if (value) {
+            const activeBtn = document.querySelector(`.leitfaden-btn[data-field="${fieldId}"][data-value="${value}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+        }
+    });
+
+    // --- 3. Performance-Slider ---
+    const slider = document.getElementById('performance_slider');
+    const hiddenInput = document.getElementById('performance_mark_hidden');
+    const display = document.getElementById('performance_display');
+    if (slider && hiddenInput && display) {
+        slider.addEventListener('input', function() {
+            const val = this.value;
+            hiddenInput.value = val;
+            display.textContent = val;
+        });
+        // Initialwert setzen
+        if (hiddenInput.value) {
+            slider.value = hiddenInput.value;
+            display.textContent = hiddenInput.value;
+        } else {
+            slider.value = 5;
+            hiddenInput.value = 5;
+            display.textContent = 5;
+        }
+    }
+
+    // --- 4. Optional: Zeitaufwand auf ganze Minuten beschränken ---
+    const timeInput = document.getElementById('time_spent_input');
+    if (timeInput) {
+        timeInput.addEventListener('blur', function() {
+            let val = parseInt(this.value);
+            if (isNaN(val) || val < 1) val = 1;
+            this.value = val;
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header telekom-bg-magenta text-white">
+                <h2>{{ title }}: {{ team.name }}</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin.edit_team', team_id=team.id) }}" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="form-group">
+                        {{ form.name.label(class="form-control-label") }}
+                        {{ form.name(class="form-control " + ("is-invalid" if form.name.errors else ""), readonly=(team.name == 'ARCHIV')) }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.team_leaders.label(class="form-control-label") }}
+                        {{ form.team_leaders(class="form-control custom-select " + ("is-invalid" if form.team_leaders.errors else ""), multiple=True, size=5, disabled=(team.name == 'ARCHIV')) }}
+                        <small class="form-text text-muted">Halte Strg (Cmd) gedrückt, um mehrere Teamleiter auszuwählen.</small>
+                        {% if form.team_leaders.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.team_leaders.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if team.name != 'ARCHIV' %}
+                    <div class="form-group">
+                        {{ form.submit(class="btn telekom-button") }}
+                        <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Abbrechen</a>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        
+        {% if team.name != 'ARCHIV' %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3>Mitglieder in diesem Team</h3>
+            </div>
+            <div class="card-body">
+                {% if team.members.all() %}
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th class="text-right">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in team.members.order_by('name') %}
+                        <tr>
+                            <td>{{ member.name }}</td>
+                            <td class="text-right">
+                                <a href="{{ url_for('admin.edit_team_member', member_id=member.id) }}" class="btn btn-sm btn-secondary">Bearbeiten</a>
+                                <form action="{{ url_for('admin.move_to_archiv', member_id=member.id) }}" method="POST" style="display: inline-block; margin-left: 5px;">
+                                    <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Sind Sie sicher, dass Sie dieses Mitglied ins Archiv verschieben möchten? Es wird aus diesem Team entfernt.')">
+                                        Ins ARCHIV
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>Diesem Team sind aktuell keine Mitglieder zugeordnet.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

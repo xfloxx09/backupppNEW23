@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header telekom-bg-magenta text-white">
+                <h2>{{ title }}</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin.create_team_member') }}" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="form-group">
+                        {{ form.name.label(class="form-control-label") }}
+                        {{ form.name(class="form-control " + ("is-invalid" if form.name.errors else ""), placeholder="Vollständiger Name des Teammitglieds") }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Projektauswahl (nur zur Filterung) -->
+                    <div class="form-group">
+                        <label for="project_filter">Projekt</label>
+                        <select class="form-control" id="project_filter">
+                            <option value="">-- Projekt wählen --</option>
+                            {% for project in projects %}
+                                <option value="{{ project.id }}">{{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Wähle ein Projekt, um die Teams zu filtern.</small>
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.team_id.label(class="form-control-label") }}
+                        <select name="team_id" id="team_id" class="form-control custom-select" required>
+                            <option value="">-- Zuerst Projekt wählen --</option>
+                            {% for team in all_teams %}
+                                <option value="{{ team.id }}" data-project-id="{{ team.project_id }}" style="display: none;">{{ team.name }} ({{ team.project_ref.name }})</option>
+                            {% endfor %}
+                        </select>
+                        {% if form.team_id.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.team_id.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.submit(class="btn telekom-button") }}
+                        <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Abbrechen</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const projectFilter = document.getElementById('project_filter');
+    const teamSelect = document.getElementById('team_id');
+    const teamOptions = Array.from(teamSelect.options).slice(1); // Alle außer dem ersten Placeholder
+
+    function filterTeams() {
+        const selectedProjectId = projectFilter.value;
+        teamOptions.forEach(option => {
+            const teamProjectId = option.getAttribute('data-project-id');
+            if (!selectedProjectId) {
+                option.style.display = 'none'; // Wenn kein Projekt gewählt, alle ausblenden
+            } else {
+                if (teamProjectId === selectedProjectId) {
+                    option.style.display = 'block';
+                } else {
+                    option.style.display = 'none';
+                }
+            }
+        });
+        // Placeholder auswählen
+        teamSelect.selectedIndex = 0;
+    }
+
+    projectFilter.addEventListener('change', filterTeams);
+    filterTeams(); // Initial ausführen
+});
+</script>
+{% endblock %}

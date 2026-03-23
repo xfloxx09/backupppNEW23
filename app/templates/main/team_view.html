@@ -1,0 +1,548 @@
+{# app/templates/main/team_view.html #}
+{% extends "base.html" %}
+
+{% block head_extra %}
+    {# Font Awesome is already assumed to be in your base.html or style.css #}
+    {# Chart.js is already linked in base.html #}
+<style>
+    /* General Page Adjustments for Dark Theme (if not already in style.css) */
+    body { 
+        /* background-color: #212529; */ /* Assuming dark from style.css */
+        /* color: #f8f9fa; */
+    }
+    h2, h3, h4 {
+        color: #f8f9fa; 
+    }
+
+    /* Top Team Info Card (NOW DARKER) */
+    .team-info-card {
+        background-color: #2c3238; /* A slightly different dark shade, or same as member-card */
+        color: #f8f9fa;         /* Light text */
+        border: 1px solid #444950;   /* Darker border */
+    }
+    .team-info-card strong.stat-label { /* Labels like "Team Name:" */
+        color: #adb5bd; /* Light muted gray for labels */
+        font-size: 0.9rem;
+        text-transform: uppercase;
+    }
+    .team-info-card p.stat-value { /* Values like team name, leader name */
+        color: #ffffff; /* White or very light gray for values */
+        font-weight: 500;
+        font-size: 1.1rem;
+    }
+
+    /* Member Performance Cards (Dark background, light text) */
+    .member-card {
+        background-color: #394047; 
+        border: 1px solid #555e67; 
+        color: #f8f9fa; 
+    }
+    .member-card .card-title { 
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #ffffff; 
+        margin-bottom: 0.75rem;
+        border-bottom: 1px solid #555e67; 
+        padding-bottom: 0.5rem;
+    }
+    .member-card .card-body {
+        padding: 1.25rem;
+    }
+    .member-card .stat-group {
+        margin-bottom: 1rem;
+    }
+    .member-card .stat-label { 
+        font-size: 0.75rem; 
+        color: #adb5bd;   
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.2rem;
+        display: block; 
+    }
+    .member-card .stat-value { 
+        font-size: 1.3rem;
+        font-weight: bold; 
+        color: #e20074; 
+    }
+    .member-card .stat-value-small { 
+        font-size: 1.1rem; 
+        font-weight: bold;
+        color: #e20074;
+    }
+    .member-card .progress {
+        height: 20px; 
+        margin-bottom: 1rem; 
+        background-color: #5a6268; 
+        border-radius: .25rem; 
+    }
+    .member-card .progress-bar { 
+        font-size: 0.8rem;
+        line-height: 20px; 
+        color: white;
+        font-weight: bold;
+        text-shadow: 0 0 2px rgba(0,0,0,0.6); 
+    }
+    .details-link-container {
+        margin-top: 1rem; 
+    }
+    
+    .table-dark th, .table-dark td, .table-dark thead th { /* Ensure text in dark table is light */
+        color: #f8f9fa;
+        border-color: #454d55; /* Darker border for table cells */
+    }
+    .table-striped.table-dark tbody tr:nth-of-type(odd) {
+        background-color: rgba(255, 255, 255, .03); 
+    }
+     .card.card-body.bg-dark-details { /* Specific class for collapsible details */
+        background-color: #394047 !important; /* Same as member card or slightly different */
+        color: #f8f9fa;
+        border: 1px solid #555e67 !important;
+    }
+    .card.card-body.bg-dark-details hr {
+        border-top: 1px solid #555e67;
+    }
+    .card.card-body.bg-dark-details strong {
+        color: #ced4da; /* Slightly brighter for strong tags in details */
+    }
+    /* Styles for the modal */
+    .modal-header-telekom {
+        background-color: #e20074; /* Telekom Magenta */
+        color: white;
+        border-bottom: 1px solid #a70057; /* Darker magenta for separation */
+    }
+    .modal-header-telekom .close {
+        color: white;
+        text-shadow: 0 1px 0 #000;
+        opacity: 0.8;
+    }
+    .modal-content.bg-dark { /* Ensure modal content matches dark theme */
+        background-color: #343a40; /* Bootstrap dark background */
+        border: 1px solid #454d55;
+    }
+    .modal-footer {
+         border-top: 1px solid #454d55;
+    }
+    #coachingTrendChart {
+        max-height: 400px; 
+    }
+    .telekom-button-outline-secondary { /* For the Trend button */
+        color: #adb5bd;
+        background-color: transparent;
+        background-image: none;
+        border-color: #adb5bd;
+    }
+    .telekom-button-outline-secondary:hover {
+        color: #fff;
+        background-color: #adb5bd;
+        border-color: #adb5bd;
+    }
+
+    /* NEW CLASS FOR THE FILLED "COACHINGS" BUTTON */
+    .telekom-button-filled-magenta {
+        background-color: #e20074; /* Telekom Magenta fill */
+        color: white;              /* White text */
+        border-color: #e20074;     /* Matching border color */
+    }
+    .telekom-button-filled-magenta:hover {
+        background-color: #c0005e; /* Darker Magenta for Hover, from your style.css .telekom-button:hover */
+        border-color: #c0005e;   /* Darker border for Hover */
+        color: white;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+        <h2 class="mb-2 mb-md-0">{{ title }}</h2>
+        {% if all_teams_list and all_teams_list|length > 1 and current_user.role in [config.ROLE_ADMIN, config.ROLE_PROJEKTLEITER, config.ROLE_ABTEILUNGSLEITER, config.ROLE_QM, config.ROLE_SALESCOACH, config.ROLE_TRAINER] %}
+        <div class="form-group mb-0">
+            <form method="GET" action="{{ url_for('main.team_view') }}" id="selectTeamForm" class="form-inline">
+                <label for="team_id_select" class="mr-2 sr-only">Team wechseln:</label>
+                <select name="team_id" id="team_id_select" class="form-control custom-select form-control-sm" onchange="this.form.submit()" title="Anderes Team anzeigen">
+                    {% for t_opt in all_teams_list %}
+                        <option value="{{ t_opt.id }}" {% if team and team.id == t_opt.id %}selected{% endif %}>
+                            {{ t_opt.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if team %}
+        <div class="card team-info-card mb-4 shadow-sm"> 
+            <div class="card-body">
+                <div class="row text-center text-md-left">
+                    <div class="col-md-4 mb-2 mb-md-0">
+                        <strong class="stat-label">Team Name:</strong>
+                        <p class="stat-value mb-0">{{ team.name }}</p>
+                    </div>
+                    <div class="col-md-4 mb-2 mb-md-0">
+    <strong class="stat-label">Teamleiter:</strong>
+    <p class="stat-value mb-0">
+        {{ team.leaders|map(attribute='username')|join(', ') or '-' }}
+    </p>
+</div>
+                    <div class="col-md-4">
+                        <strong class="stat-label">Anzahl Mitglieder:</strong>
+                        <p class="stat-value mb-0">{{ team.members.count() }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if team_members_performance %}
+            <h4 class="mb-3">Teammitglieder Performance</h4>
+            <div class="row">
+                {% for member_stat in team_members_performance %}
+                <div class="col-xl-3 col-lg-4 col-md-6 mb-4">
+                    <div class="card member-card h-100 shadow-sm">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title text-center">{{ member_stat.name }}</h5>
+                            
+                            <div class="stat-group text-center">
+                                <div class="stat-label">Durchschnittlicher Score</div>
+                                <div class="progress mx-auto" style="max-width: 180px;">
+                                    <div class="progress-bar {% if member_stat.avg_score == 0 and member_stat.total_coachings == 0 %}bg-secondary{% elif member_stat.avg_score >= (config.PERFORMANCE_BENCHMARK or 80) %}bg-success{% elif member_stat.avg_score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                         role="progressbar" 
+                                         style="width: {{ member_stat.avg_score }}%;" 
+                                         aria-valuenow="{{ member_stat.avg_score }}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                        {{ member_stat.avg_score|round(0) if member_stat.total_coachings > 0 else 'N/A' }}%
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row text-center mt-auto pt-3"> 
+                                <div class="col-6 border-right" style="border-color: #555e67 !important;">
+                                    <div class="stat-label">Coachings</div>
+                                    <div class="stat-value">{{ member_stat.total_coachings }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="stat-label">Gesamtzeit</div>
+                                    <div class="stat-value-small">{{ member_stat.formatted_total_coaching_time }}</div>
+                                </div>
+                            </div>
+                             
+                             <div class="text-center details-link-container mt-auto d-flex justify-content-around align-items-center">
+                                 {# KORRIGIERTER "Coachings" BUTTON #}
+                                 <a href="{{ url_for('main.coaching_dashboard', member_id=member_stat.id) }}" class="btn btn-sm telekom-button-filled-magenta mr-1">
+                                     Coachings
+                                 </a>
+                                 {# Trend Button #}
+                                 {% if member_stat.id and member_stat.total_coachings > 0 %}
+                                 <button class="btn btn-sm telekom-button-outline-secondary view-trend-btn ml-1" 
+                                         data-member-id="{{ member_stat.id }}" 
+                                         data-member-name="{{ member_stat.name }}"
+                                         title="Coaching Trend anzeigen für {{ member_stat.name }}">
+                                     <i class="fas fa-chart-line"></i> Trend
+                                 </button>
+                                 {% else %}
+                                 <button class="btn btn-sm btn-outline-secondary ml-1" disabled title="Keine Coaching Daten für Trend">
+                                     <i class="fas fa-chart-line"></i> Trend
+                                 </button>
+                                 {% endif %}
+                             </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% elif team.members.count() > 0 %}
+             <p class="text-muted">Für die Mitglieder dieses Teams wurden noch keine Coachings erfasst oder Performance-Daten berechnet.</p>
+        {% else %}
+            <p class="text-muted">Dieses Team hat aktuell keine Mitglieder.</p>
+        {% endif %}
+        <hr class="my-4" style="border-color: #444;">
+    {% endif %}
+
+
+    {% if team_coachings %}
+        <h4 class="mt-4 mb-3">Letzte Coachings im Team {% if team %}"{{ team.name }}"{% endif %} (Top 10)</h4>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-dark"> 
+                <thead class="telekom-bg-magenta text-white">
+                    <tr>
+                        <th>Datum</th>
+                        <th>Teammitglied</th>
+                        <th>Coach</th>
+                        <th>Thema</th>
+                        <th>Score (%)</th>
+                        <th>Aktionen</th> 
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for coaching in team_coachings %}
+                    <tr>
+                        <td>{{ coaching.coaching_date|athens_time('%d.%m.%y %H:%M') }}</td>
+                        <td>{{ coaching.team_member_coached.name if coaching.team_member_coached else 'N/A' }}</td>
+                        <td>{{ coaching.coach.username if coaching.coach else 'N/A' }}</td>
+                        <td>{{ coaching.coaching_subject }}</td>
+                        <td>{{ coaching.overall_score|round(0) }}%</td>
+                        <td>
+                             {% if current_user.id == coaching.coach_id or current_user.role == config.ROLE_ADMIN %}
+                            <a href="{{ url_for('main.edit_coaching', coaching_id=coaching.id, next=request.url) }}" 
+                               class="btn btn-xs btn-outline-light mr-1" title="Bearbeiten">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            {% endif %}
+                            <button class="btn btn-xs telekom-button-outline" type="button" data-toggle="collapse" data-target="#teamViewCoachingDetails{{ coaching.id }}" aria-expanded="false">
+                                Details
+                            </button>
+                        </td>
+                    </tr>
+                     <tr class="collapse" id="teamViewCoachingDetails{{ coaching.id }}">
+                        <td colspan="6"> 
+                            <div class="card card-body bg-dark-details"> 
+                                <strong>Stil:</strong> {{ coaching.coaching_style if coaching.coaching_style else '-'}} 
+                                {% if coaching.coaching_style == 'TCAP' and coaching.tcap_id %} (ID: {{ coaching.tcap_id }}) {% endif %}<br>
+                                <strong>Performance Note (0-10):</strong> {{ coaching.performance_mark }}<br>
+                                <strong>Zeitaufwand:</strong> {{ coaching.time_spent }} Min.<br>
+                                <hr>
+                                <strong>Leitfaden-Checkmarks:</strong><br>
+                                <ul class="list-unstyled ml-3">
+                                {% for name, value in coaching.leitfaden_fields_list %}
+                                    <li>{{ name }}: <strong>{{ value }}</strong></li>
+                                {% endfor %}
+                                </ul>
+                                <strong>Leitfaden Erfüllung:</strong> {{ coaching.leitfaden_erfuellung_display }}
+                                
+                                {% if coaching.coach_notes %}
+                                <hr><strong>Notizen des Coaches:</strong><br><p style="white-space: pre-wrap;">{{ coaching.coach_notes }}</p>
+                                {% endif %}
+                                {% if coaching.project_leader_notes %}
+                                <hr><strong>PL/QM Notiz:</strong><br><p style="white-space: pre-wrap;">{{ coaching.project_leader_notes }}</p>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% elif team %} 
+        <p class="mt-4 text-muted">Für dieses Team wurden im ausgewählten Zeitraum keine Coachings gefunden.</p>
+    {% endif %}
+
+    {% if not team and all_teams_list %}
+        <h3 class="mt-5 text-center text-muted">Bitte wählen Sie oben ein Team aus der Liste aus.</h3>
+    {% elif not team and not all_teams_list and current_user.role not in [config.ROLE_TEAMLEITER] %}
+        <p class="mt-5 text-center text-muted">Es sind keine Teams im System vorhanden, die angezeigt werden könnten.</p>
+    {% endif %}
+
+</div>
+
+{# NEW: Modal for Coaching Trend #}
+<div class="modal fade" id="coachingTrendModal" tabindex="-1" role="dialog" aria-labelledby="coachingTrendModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content bg-dark text-light"> {# Applied bg-dark and text-light for consistency #}
+      <div class="modal-header modal-header-telekom">
+        <h5 class="modal-title" id="coachingTrendModalLabel">Coaching Trend für <span id="trendMemberName"></span></h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row mb-3 align-items-end">
+            <div class="col-auto">
+                <label for="coachingCountSelect" class="text-light small">Anzahl Coachings anzeigen:</label>
+                <select id="coachingCountSelect" class="form-control form-control-sm custom-select bg-secondary text-light border-secondary" style="width: auto;">
+                    <option value="5">Letzte 5</option>
+                    <option value="10" selected>Letzte 10</option>
+                    <option value="15">Letzte 15</option>
+                    <option value="20">Letzte 20</option>
+                    <option value="all">Alle</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button id="refreshTrendChart" class="btn btn-sm telekom-button-outline">Aktualisieren</button>
+            </div>
+        </div>
+        <div style="position: relative; height:40vh; min-height: 300px;"> {# Wrapper for chart responsiveness #}
+            <canvas id="coachingTrendChart"></canvas>
+        </div>
+        <p id="noTrendDataMessage" class="text-center text-muted mt-3" style="display: none;">Keine ausreichenden Coaching-Daten für diesen Trend vorhanden.</p>
+      </div>
+      <div class="modal-footer"> {# Removed specific border-top, inherits from modal-content #}
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Schließen</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }} {# Preserves scripts from base.html #}
+<script>
+$(document).ready(function() {
+    let trendChartInstance = null;
+    let currentTrendMemberId = null;
+    let currentTrendMemberName = null; // Store name for refresh
+
+    // Use event delegation for dynamically added modals or if needed in future
+    $('body').on('click', '.view-trend-btn', function() {
+        currentTrendMemberId = $(this).data('member-id');
+        currentTrendMemberName = $(this).data('member-name');
+        
+        $('#trendMemberName').text(currentTrendMemberName);
+        // Reset count selector to default (e.g., 10) when modal is opened for a new member
+        $('#coachingCountSelect').val('10'); 
+        
+        fetchAndRenderTrend(currentTrendMemberId, $('#coachingCountSelect').val());
+        $('#coachingTrendModal').modal('show'); // Manually show modal
+    });
+
+    $('#refreshTrendChart').on('click', function() {
+        if (currentTrendMemberId) {
+            fetchAndRenderTrend(currentTrendMemberId, $('#coachingCountSelect').val());
+        }
+    });
+    
+    // When the modal is about to be hidden
+    $('#coachingTrendModal').on('hide.bs.modal', function () {
+        if (trendChartInstance) {
+            trendChartInstance.destroy();
+            trendChartInstance = null;
+        }
+        $('#noTrendDataMessage').hide();
+        $('#coachingTrendChart').show(); // Ensure canvas is visible for next time
+    });
+
+    function fetchAndRenderTrend(memberId, count) {
+        if (!memberId) return;
+
+        if (trendChartInstance) trendChartInstance.destroy(); 
+        $('#coachingTrendChart').hide();
+        $('#noTrendDataMessage').html('<i class="fas fa-spinner fa-spin"></i> Lade Trend Daten...').show();
+
+        $.ajax({
+            url: "{{ url_for('main.get_member_coaching_trend') }}",
+            type: 'GET',
+            data: {
+                team_member_id: memberId, 
+                count: count
+            },
+            success: function(response) {
+                if (response.labels && response.labels.length > 1) { 
+                    renderChart(response.labels, response.scores, response.dates);
+                    $('#noTrendDataMessage').hide();
+                    $('#coachingTrendChart').show();
+                } else if (response.labels && response.labels.length === 1) {
+                    renderChart(response.labels, response.scores, response.dates); 
+                    $('#noTrendDataMessage').text('Nur ein Coaching-Datenpunkt vorhanden. Trendlinie nicht darstellbar.').show();
+                     $('#coachingTrendChart').show();
+                }
+                else {
+                    if (trendChartInstance) trendChartInstance.destroy();
+                    $('#coachingTrendChart').hide();
+                    $('#noTrendDataMessage').text('Keine ausreichenden Coaching-Daten für diesen Trend vorhanden.').show();
+                }
+            },
+            error: function(xhr) {
+                console.error("Error fetching trend data:", xhr.responseText);
+                if (trendChartInstance) trendChartInstance.destroy();
+                $('#coachingTrendChart').hide();
+                $('#noTrendDataMessage').text('Fehler beim Laden der Trend-Daten. Bitte versuchen Sie es später erneut.').show();
+            }
+        });
+    }
+
+    function renderChart(labels, scores, dates) { 
+        if (trendChartInstance) {
+            trendChartInstance.destroy();
+        }
+        const ctx = document.getElementById('coachingTrendChart').getContext('2d');
+        trendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates, 
+                datasets: [{
+                    label: 'Overall Score (%)',
+                    data: scores,
+                    borderColor: '#e20074', 
+                    backgroundColor: 'rgba(226, 0, 116, 0.2)', 
+                    tension: 0.1, 
+                    fill: true,
+                    pointBackgroundColor: '#ffffff',
+                    pointBorderColor: '#e20074',
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                    pointHoverBackgroundColor: '#e20074',
+                    pointHoverBorderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Score (%)',
+                            color: '#adb5bd'
+                        },
+                        ticks: {
+                            color: '#f8f9fa',
+                            stepSize: 10 
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)' 
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Coaching Datum',
+                            color: '#adb5bd'
+                        },
+                        ticks: {
+                            color: '#f8f9fa',
+                            maxRotation: 45, 
+                            minRotation: 0
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#f8f9fa'
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        callbacks: { 
+                             title: function(tooltipItems) {
+                                return labels[tooltipItems[0].dataIndex]; 
+                            },
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y + '%';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

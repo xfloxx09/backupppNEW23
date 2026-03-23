@@ -1,0 +1,179 @@
+{# app/templates/admin/manage_workshops.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2>{{ title }}</h2>
+
+    {# Filter Form #}
+    <form method="GET" action="{{ url_for('admin.manage_workshops') }}" id="filterWorkshopForm" class="mb-4 card card-body">
+        <div class="form-row align-items-end">
+            {# Period Filter #}
+            <div class="col-md-4 mb-2">
+                <label for="period_filter">Zeitraum:</label>
+                <select name="period" id="period_filter" class="form-control custom-select form-control-sm">
+                    <option value="all" {% if not current_period_filter or current_period_filter == 'all' %}selected{% endif %}>Alles</option>
+                    <option value="7days" {% if current_period_filter == '7days' %}selected{% endif %}>Letzte 7 Tage</option>
+                    <option value="30days" {% if current_period_filter == '30days' %}selected{% endif %}>Letzte 30 Tage</option>
+                    <option value="current_quarter" {% if current_period_filter == 'current_quarter' %}selected{% endif %}>Dieses Quartal</option>
+                    <option value="current_year" {% if current_period_filter == 'current_year' %}selected{% endif %}>Dieses Jahr</option>
+                    {% if month_options %}
+                    <optgroup label="Spezifische Monate">
+                        {% for month_opt in month_options|reverse %}
+                            <option value="{{ month_opt.value }}" {% if current_period_filter == month_opt.value %}selected{% endif %}>
+                                {{ month_opt.text }}
+                            </option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endif %}
+                </select>
+            </div>
+
+            {# Search Filter #}
+            <div class="col-md-6 mb-2">
+                <label for="search_filter">Freitextsuche (Titel, Notizen, Coach):</label>
+                <input type="text" name="search" id="search_filter" class="form-control form-control-sm" placeholder="Suchbegriff..." value="{{ current_search_term or '' }}">
+            </div>
+            <div class="col-md-2 mb-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-sm btn-block">Filter Anwenden</button>
+                <a href="{{ url_for('admin.manage_workshops') }}" class="btn btn-secondary btn-sm ml-2" title="Filter zurücksetzen"><i class="fas fa-times"></i> Reset</a>
+            </div>
+        </div>
+    </form>
+
+    {# Form for Bulk Actions #}
+    <form method="POST" action="{{ url_for('admin.manage_workshops', page=workshops_paginated.page, period=current_period_filter, search=current_search_term) }}" id="bulkActionForm">
+        {{ csrf_token if csrf_token else '' }}
+        
+        <div class="mb-3">
+            {% if workshops_paginated.items %}
+            <button type="submit" name="delete_selected" class="btn btn-danger btn-sm" onclick="return confirm('Sind Sie sicher, dass Sie die ausgewählten Workshops löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.');">
+                <i class="fas fa-trash-alt"></i> Ausgewählte löschen
+            </button>
+            {% endif %}
+        </div>
+
+        {% if workshops_paginated.items %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm">
+                <thead class="thead-dark">
+                    <tr>
+                        <th><input type="checkbox" id="selectAllCheckbox"></th>
+                        <th>Datum</th>
+                        <th>Thema</th>
+                        <th>Coach</th>
+                        <th>Teilnehmer</th>
+                        <th>Bewertung</th>
+                        <th>Minuten</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for workshop in workshops_paginated.items %}
+                    <tr>
+                        <td><input type="checkbox" name="workshop_ids" value="{{ workshop.id }}" class="workshop-checkbox"></td>
+                        <td>{{ workshop.workshop_date|athens_time('%d.%m.%y %H:%M') }}</td>
+                        <td>{{ workshop.title }}</td>
+                        <td>{{ workshop.coach.username if workshop.coach else 'N/A' }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" type="button" data-toggle="collapse" data-target="#participants{{ workshop.id }}" aria-expanded="false">
+                                {{ workshop.participants.count() }} Teilnehmer
+                            </button>
+                        </td>
+                        <td>{{ workshop.overall_rating }}/10</td>
+                        <td>{{ workshop.time_spent }}</td>
+                        <td>
+                            <a href="{{ url_for('admin.edit_workshop_entry', workshop_id=workshop.id) }}" class="btn btn-info btn-xs mr-1" title="Bearbeiten"><i class="fas fa-edit"></i></a>
+                            <a href="#" class="btn btn-danger btn-xs" title="Einzeln löschen" onclick="event.preventDefault(); if(confirm('Diesen Workshop wirklich löschen?')) { document.getElementById('delete-workshop-{{ workshop.id }}-form').submit(); }"><i class="fas fa-trash-alt"></i></a>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="participants{{ workshop.id }}">
+                        <td colspan="8">
+                            <div class="card card-body">
+                                <strong>Teilnehmer mit Einzelbewertungen:</strong>
+                                <ul>
+                                    {% for participant in workshop.participants %}
+                                        <li>
+                                            {{ participant.name }}: 
+                                            {% set rating = db.session.query(workshop_participants.c.individual_rating).filter_by(workshop_id=workshop.id, team_member_id=participant.id).scalar() %}
+                                            <strong>{{ rating }}/10</strong>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                                {% if workshop.notes %}
+                                <hr>
+                                <strong>Notizen:</strong>
+                                <p style="white-space: pre-wrap;">{{ workshop.notes }}</p>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {# Hidden form for single delete #}
+                    <form id="delete-workshop-{{ workshop.id }}-form" action="{{ url_for('admin.delete_workshop_entry', workshop_id=workshop.id) }}" method="POST" style="display: none;">
+                        {{ csrf_token if csrf_token else '' }}
+                    </form>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Pagination #}
+        <nav aria-label="Workshop Management Navigation">
+            <ul class="pagination justify-content-center">
+                {% if workshops_paginated.has_prev %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('admin.manage_workshops', page=workshops_paginated.prev_num, period=current_period_filter, search=current_search_term) }}">Vorherige</a></li>
+                {% endif %}
+                {% for page_num in workshops_paginated.iter_pages() %}
+                    {% if page_num %}
+                        <li class="page-item {% if workshops_paginated.page == page_num %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('admin.manage_workshops', page=page_num, period=current_period_filter, search=current_search_term) }}">{{ page_num }}</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                {% if workshops_paginated.has_next %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('admin.manage_workshops', page=workshops_paginated.next_num, period=current_period_filter, search=current_search_term) }}">Nächste</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% else %}
+        <p class="text-center">Keine Workshops gefunden, die den Filtern entsprechen.</p>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const workshopCheckboxes = document.querySelectorAll('.workshop-checkbox');
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            workshopCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+        });
+    }
+
+    workshopCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (!this.checked) {
+                selectAllCheckbox.checked = false;
+            } else {
+                let allChecked = true;
+                workshopCheckboxes.forEach(cb => {
+                    if (!cb.checked) {
+                        allChecked = false;
+                    }
+                });
+                selectAllCheckbox.checked = allChecked;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header telekom-bg-magenta text-white">
+                 <h2>{{ title }}: {{ user.username }}</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin.edit_user', user_id=user.id) }}" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="form-group">
+                        {{ form.username.label(class="form-control-label") }}
+                        {{ form.username(class="form-control " + ("is-invalid" if form.username.errors else "")) }}
+                        {% if form.username.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.username.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.email.label(class="form-control-label") }}
+                        {{ form.email(class="form-control " + ("is-invalid" if form.email.errors else "")) }}
+                        {% if form.email.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.email.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.password.label(class="form-control-label") }} (Leer lassen, um nicht zu ändern)
+                        {{ form.password(class="form-control " + ("is-invalid" if form.password.errors else ""), placeholder="Neues Passwort") }}
+                        {% if form.password.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.password.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.password2.label(class="form-control-label") }} (Leer lassen, um nicht zu ändern)
+                        {{ form.password2(class="form-control " + ("is-invalid" if form.password2.errors else ""), placeholder="Neues Passwort bestätigen") }}
+                        {% if form.password2.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.password2.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.role.label(class="form-control-label") }}
+                        {{ form.role(class="form-control custom-select " + ("is-invalid" if form.role.errors else "")) }}
+                        {% if form.role.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.role.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" id="project_select_div">
+                        {{ form.project_id.label(class="form-control-label") }}
+                        {{ form.project_id(class="form-control custom-select " + ("is-invalid" if form.project_id.errors else "")) }}
+                        {% if form.project_id.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.project_id.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" id="project_multi_select_div">
+                        {{ form.project_ids.label(class="form-control-label") }}
+                        {{ form.project_ids(class="form-control custom-select " + ("is-invalid" if form.project_ids.errors else ""), multiple=True, size=5) }}
+                        <small class="form-text text-muted">Halte Strg (Cmd) gedrückt, um mehrere Projekte auszuwählen.</small>
+                        {% if form.project_ids.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.project_ids.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group" id="team_select_div_user_edit">
+                        {{ form.team_ids.label(class="form-control-label") }}
+                        {{ form.team_ids(class="form-control custom-select " + ("is-invalid" if form.team_ids.errors else ""), multiple=True, size=5) }}
+                        <small class="form-text text-muted">Nur relevant, wenn Rolle 'Teamleiter' ist.</small>
+                        {% if form.team_ids.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.team_ids.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.submit(class="btn telekom-button") }}
+                        <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Abbrechen</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var roleSelect = document.getElementById('role');
+    var teamDiv = document.getElementById('team_select_div_user_edit');
+    var projectSingleDiv = document.getElementById('project_select_div');
+    var projectMultiDiv = document.getElementById('project_multi_select_div');
+
+    function toggleFields() {
+        if (roleSelect.value === 'Teamleiter') {
+            teamDiv.style.display = 'block';
+        } else {
+            teamDiv.style.display = 'none';
+        }
+
+        if (roleSelect.value === 'Abteilungsleiter') {
+            projectSingleDiv.style.display = 'none';
+            projectMultiDiv.style.display = 'block';
+        } else {
+            projectSingleDiv.style.display = 'block';
+            projectMultiDiv.style.display = 'none';
+        }
+    }
+
+    if (roleSelect) {
+        roleSelect.addEventListener('change', toggleFields);
+        toggleFields();
+    }
+});
+</script>
+{% endblock %}

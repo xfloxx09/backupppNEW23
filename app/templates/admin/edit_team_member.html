@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header telekom-bg-magenta text-white">
+                <h2>{{ title }}: {{ member.name }}</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin.edit_team_member', member_id=member.id) }}" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="form-group">
+                        {{ form.name.label(class="form-control-label") }}
+                        {{ form.name(class="form-control " + ("is-invalid" if form.name.errors else "")) }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Projektauswahl (nur zur Filterung) -->
+                    <div class="form-group">
+                        <label for="project_filter">Projekt</label>
+                        <select class="form-control" id="project_filter">
+                            <option value="">-- Projekt wählen --</option>
+                            {% for project in projects %}
+                                <option value="{{ project.id }}" {% if project.id == member.team.project_id %}selected{% endif %}>{{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Wähle ein Projekt, um die Teams zu filtern.</small>
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.team_id.label(class="form-control-label") }}
+                        <select name="team_id" id="team_id" class="form-control custom-select" required>
+                            <option value="">-- Team wählen --</option>
+                            {% for team in all_teams %}
+                                <option value="{{ team.id }}" data-project-id="{{ team.project_id }}" {% if team.id == member.team_id %}selected{% endif %}>{{ team.name }} ({{ team.project_ref.name }})</option>
+                            {% endfor %}
+                        </select>
+                        {% if form.team_id.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.team_id.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.submit(class="btn telekom-button") }}
+                        <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Abbrechen</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const projectFilter = document.getElementById('project_filter');
+    const teamSelect = document.getElementById('team_id');
+    const teamOptions = Array.from(teamSelect.options).slice(1); // Alle außer dem ersten Placeholder
+
+    function filterTeams() {
+        const selectedProjectId = projectFilter.value;
+        teamOptions.forEach(option => {
+            const teamProjectId = option.getAttribute('data-project-id');
+            if (!selectedProjectId) {
+                option.style.display = 'none';
+            } else {
+                if (teamProjectId === selectedProjectId) {
+                    option.style.display = 'block';
+                } else {
+                    option.style.display = 'none';
+                }
+            }
+        });
+
+        // Wenn die aktuell ausgewählte Option nicht zum gewählten Projekt gehört, setze auf Placeholder
+        if (teamSelect.selectedOptions[0] && teamSelect.selectedOptions[0].style.display === 'none') {
+            teamSelect.selectedIndex = 0;
+        }
+    }
+
+    // Initial: Wenn bereits ein Projekt ausgewählt ist (beim Bearbeiten), filtere sofort
+    if (projectFilter.value) {
+        filterTeams();
+        // Stelle sicher, dass die ausgewählte Option sichtbar ist
+        teamOptions.forEach(option => {
+            if (option.selected && option.getAttribute('data-project-id') === projectFilter.value) {
+                option.style.display = 'block';
+            }
+        });
+    }
+
+    projectFilter.addEventListener('change', filterTeams);
+});
+</script>
+{% endblock %}

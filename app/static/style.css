@@ -1,0 +1,164 @@
+body {
+    background-color: #1a1a1a; /* Dunkles Schwarz/Grau */
+    color: #f0f0f0; /* Heller Text für Kontrast */
+    font-family: 'TeleNeo', 'Helvetica Neue', Helvetica, Arial, sans-serif; /* Telekom Schriftart, falls verfügbar */
+}
+
+/* Telekom Magenta: #e20074 */
+/* Telekom Dunkelgrau (fast schwarz): #333333 oder dunkler */
+/* Telekom Hellgrau für Akzente: #f0f0f0 */
+
+.telekom-brand {
+    font-weight: bold;
+    color: #e20074 !important;
+}
+
+.navbar {
+    background-color: #000000 !important; /* Schwarze Navbar */
+    border-bottom: 2px solid #e20074;
+}
+
+.nav-link {
+    color: #f0f0f0 !important;
+}
+.nav-link:hover {
+    color: #e20074 !important;
+}
+
+.telekom-button {
+    background-color: #e20074;
+    border-color: #e20074;
+    color: white;
+}
+.telekom-button:hover {
+    background-color: #c0005e; /* Dunkleres Magenta für Hover */
+    border-color: #c0005e;
+    color: white;
+}
+
+.telekom-button-outline {
+    border-color: #e20074;
+    color: #e20074;
+}
+.telekom-button-outline:hover {
+    background-color: #e20074;
+    color: white;
+}
+
+
+.card {
+    background-color: #2b2b2b; /* Etwas helleres Grau für Karten */
+    border: 1px solid #444;
+}
+.card-header.telekom-bg-magenta {
+    background-color: #e20074;
+    color: white;
+    border-bottom: 1px solid #c0005e;
+}
+
+.table {
+    color: #f0f0f0; /* Textfarbe für Tabellen */
+}
+.table thead.telekom-bg-magenta th {
+    background-color: #e20074;
+    color: white;
+    border-color: #c0005e;
+}
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.05); /* Sehr dezentes Streifenmuster */
+}
+.table-hover tbody tr:hover {
+    background-color: rgba(226, 0, 116, 0.2); /* Magenta-Hover für Tabellenzeilen */
+    color: #fff;
+}
+
+.form-control {
+    background-color: #333;
+    color: #f0f0f0;
+    border: 1px solid #555;
+}
+.form-control:focus {
+    background-color: #444;
+    color: #f0f0f0;
+    border-color: #e20074;
+    box-shadow: 0 0 0 0.2rem rgba(226, 0, 116, 0.25);
+}
+.custom-select { /* Für Select-Felder */
+    background-color: #333;
+    color: #f0f0f0;
+    border: 1px solid #555;
+}
+.custom-select:focus {
+    border-color: #e20074;
+    box-shadow: 0 0 0 0.2rem rgba(226, 0, 116, 0.25);
+}
+
+
+.progress-bar.telekom-progress-bar {
+    background-color: #e20074;
+}
+.progress {
+    background-color: #555; /* Hintergrund der Progressbar */
+    height: 20px; /* Etwas höher für bessere Sichtbarkeit */
+}
+
+.alert-info {
+    background-color: #17a2b8; /* Standard Bootstrap Info, könnte man anpassen */
+    color: white;
+    border-color: #17a2b8;
+}
+.alert-success {
+    background-color: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+.alert-warning {
+    background-color: #ffc107;
+    color: #212529;
+    border-color: #ffc107;
+}
+.alert-danger {
+    background-color: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+/* Pagination Styling */
+.page-link.telekom-page-link {
+    color: #e20074;
+    background-color: #333;
+    border-color: #555;
+}
+.page-link.telekom-page-link:hover {
+    color: white;
+    background-color: #e20074;
+    border-color: #e20074;
+}
+.page-item.active .page-link.telekom-page-active {
+    z-index: 3;
+    color: #fff;
+    background-color: #e20074;
+    border-color: #e20074;
+}
+.page-item.disabled .page-link {
+    color: #6c757d;
+    background-color: #2b2b2b;
+    border-color: #444;
+}
+
+footer {
+    color: #aaa;
+}
+
+/* Spezifisch für das T-CAP ID Feld, wenn es über WTForms gerendert wird */
+#tcap_id_field label, #tcap_id_field input {
+    /* Deine Stile hier, falls nötig */
+}
+
+/* Spezifisch für Admin-Formular Buttons */
+.btn-xs { /* Bootstrap 3 Größe, in BS4 nicht Standard */
+    padding: .2rem .4rem;
+    font-size: .75rem;
+    line-height: 1.5;
+    border-radius: .2rem;
+}

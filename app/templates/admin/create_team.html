@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header telekom-bg-magenta text-white">
+                <h2>{{ title }}</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin.create_team') }}" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="form-group">
+                        {{ form.name.label(class="form-control-label") }}
+                        {{ form.name(class="form-control " + ("is-invalid" if form.name.errors else ""), placeholder="Name des Teams") }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Projektauswahl (zuerst) -->
+                    <div class="form-group">
+                        {{ form.project_id.label(class="form-control-label") }}
+                        {{ form.project_id(class="form-control custom-select " + ("is-invalid" if form.project_id.errors else ""), id="project_select") }}
+                        <small class="form-text text-muted">Wähle zuerst ein Projekt.</small>
+                        {% if form.project_id.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.project_id.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Teamleiter-Auswahl (wird dynamisch gefiltert) -->
+                    <div class="form-group">
+                        {{ form.team_leaders.label(class="form-control-label") }}
+                        <select name="team_leaders" id="team_leaders" class="form-control custom-select" multiple size="5">
+                            {% for leader in all_team_leaders %}
+                                <option value="{{ leader.id }}" data-project="{{ leader.project_id }}" style="display: none;">{{ leader.username }} ({{ leader.project_ref.name }})</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Halte Strg (Cmd) gedrückt, um mehrere Teamleiter auszuwählen.</small>
+                        {% if form.team_leaders.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.team_leaders.errors %}<span>{{ error }}</span>{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.submit(class="btn telekom-button") }}
+                        <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">Abbrechen</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const projectSelect = document.getElementById('project_select');
+    const teamLeaderSelect = document.getElementById('team_leaders');
+    const leaderOptions = Array.from(teamLeaderSelect.options);
+
+    function filterLeaders() {
+        const selectedProjectId = projectSelect.value;
+        leaderOptions.forEach(option => {
+            const leaderProjectId = option.getAttribute('data-project');
+            if (!selectedProjectId) {
+                option.style.display = 'none'; // Kein Projekt gewählt -> alle ausblenden
+                option.selected = false; // Auswahl aufheben
+            } else {
+                if (leaderProjectId === selectedProjectId) {
+                    option.style.display = 'block';
+                } else {
+                    option.style.display = 'none';
+                    option.selected = false; // Auswahl aufheben wenn ausgeblendet
+                }
+            }
+        });
+    }
+
+    projectSelect.addEventListener('change', filterLeaders);
+    filterLeaders(); // Initial ausführen
+});
+</script>
+{% endblock %}

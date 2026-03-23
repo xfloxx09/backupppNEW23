@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2>{{ title }}</h2>
+
+    <form method="GET" action="{{ url_for('main.workshop_dashboard') }}" class="mb-4">
+        <div class="form-row align-items-end">
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="period_filter">Zeitraum:</label>
+                    <select name="period" id="period_filter" class="form-control custom-select form-control-sm">
+                        <option value="all" {% if current_period_filter == 'all' %}selected{% endif %}>Alle</option>
+                        <option value="7days" {% if current_period_filter == '7days' %}selected{% endif %}>Letzte 7 Tage</option>
+                        <option value="30days" {% if current_period_filter == '30days' %}selected{% endif %}>Letzte 30 Tage</option>
+                        <option value="current_quarter" {% if current_period_filter == 'current_quarter' %}selected{% endif %}>Dieses Quartal</option>
+                        <option value="current_year" {% if current_period_filter == 'current_year' %}selected{% endif %}>Dieses Jahr</option>
+                        {% if month_options %}
+                        <optgroup label="Monate">
+                            {% for month in month_options %}
+                            <option value="{{ month.value }}" {% if current_period_filter == month.value %}selected{% endif %}>{{ month.text }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn telekom-button btn-sm">Filtern</button>
+                <a href="{{ url_for('main.workshop_dashboard') }}" class="btn btn-secondary btn-sm">Reset</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Statistik-Kacheln -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar-alt fa-3x mb-2"></i>
+                    <h5 class="card-title">Anzahl Workshops</h5>
+                    <p class="display-4">{{ total_workshops }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <i class="fas fa-clock fa-3x mb-2"></i>
+                    <h5 class="card-title">Gesamtzeit (Min.)</h5>
+                    <p class="display-4">{{ total_time }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-star fa-3x mb-2"></i>
+                    <h5 class="card-title">Ø Bewertung</h5>
+                    <p class="display-4">{{ avg_rating }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workshop-Liste -->
+    <h3 class="mt-4">Workshop-Liste</h3>
+    {% if workshops_paginated.items %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="telekom-bg-magenta text-white">
+                    <tr>
+                        <th>Datum</th>
+                        <th>Thema</th>
+                        <th>Coach</th>
+                        <th>Teilnehmer</th>
+                        <th>Bewertung</th>
+                        <th>Minuten</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for workshop in workshops_paginated.items %}
+                    <tr>
+                        <td>{{ workshop.workshop_date|athens_time('%d.%m.%y %H:%M') }}</td>
+                        <td>{{ workshop.title }}</td>
+                        <td>{{ workshop.coach.username if workshop.coach else 'N/A' }}</td>
+                        <td>{{ workshop.participants.count() }}</td>
+                        <td>{{ workshop.overall_rating }}/10</td>
+                        <td>{{ workshop.time_spent }}</td>
+                        <td>
+                            <button class="btn btn-sm telekom-button-outline" type="button" data-toggle="collapse" data-target="#workshopDetails{{ workshop.id }}" aria-expanded="false">
+                                Details
+                            </button>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="workshopDetails{{ workshop.id }}">
+                        <td colspan="7">
+                            <div class="card card-body">
+                                <strong>Teilnehmer mit Einzelbewertungen:</strong>
+                                <ul>
+                                    {% for participant in workshop.participants %}
+                                        <li>
+                                            {{ participant.name }}:
+                                            {% set rating = db.session.query(workshop_participants.c.individual_rating).filter_by(workshop_id=workshop.id, team_member_id=participant.id).scalar() %}
+                                            <strong>{{ rating }}/10</strong>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                                {% if workshop.notes %}
+                                <hr>
+                                <strong>Notizen:</strong>
+                                <p style="white-space: pre-wrap;">{{ workshop.notes }}</p>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <nav aria-label="Workshop-Navigation">
+            <ul class="pagination justify-content-center">
+                {% if workshops_paginated.has_prev %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('main.workshop_dashboard', page=workshops_paginated.prev_num, period=current_period_filter) }}">Vorherige</a></li>
+                {% endif %}
+                {% for page_num in workshops_paginated.iter_pages() %}
+                    {% if page_num %}
+                        <li class="page-item {% if workshops_paginated.page == page_num %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('main.workshop_dashboard', page=page_num, period=current_period_filter) }}">{{ page_num }}</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                {% if workshops_paginated.has_next %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('main.workshop_dashboard', page=workshops_paginated.next_num, period=current_period_filter) }}">Nächste</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% else %}
+        <p class="text-center">Keine Workshops gefunden.</p>
+    {% endif %}
+
+    <!-- Der Button wurde entfernt -->
+</div>
+{% endblock %}
