@@ -842,8 +842,8 @@ def assigned_coachings():
     else:
         query = AssignedCoaching.query.filter_by(coach_id=current_user.id)
 
-    # Fix ambiguous join: explicitly join through relationships
     if project_filter:
+        # Fix ambiguous join: explicitly join through relationships
         query = query.join(AssignedCoaching.team_member).join(TeamMember.team).filter(Team.project_id == project_filter)
 
     assignments = query.order_by(AssignedCoaching.deadline.asc(), AssignedCoaching.created_at.desc()).paginate(page=page, per_page=10, error_out=False)
