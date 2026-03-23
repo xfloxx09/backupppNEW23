@@ -65,7 +65,6 @@ class User(UserMixin, db.Model):
 
     @property
     def has_multiple_projects(self):
-        """Return True if user is allowed to access multiple projects and has >1 projects available."""
         if self.role not in [ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_ABTEILUNGSLEITER]:
             return False
         if self.role == ROLE_ABTEILUNGSLEITER:
@@ -75,7 +74,6 @@ class User(UserMixin, db.Model):
             return Project.query.count() > 1
 
     def get_allowed_project_ids(self):
-        """Return list of project IDs this user can access."""
         if self.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
             from app.models import Project
             return [p.id for p in Project.query.all()]
@@ -149,6 +147,7 @@ class Coaching(db.Model):
     project_leader_notes = db.Column(db.Text, nullable=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     team_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=True)
+    assigned_coaching_id = db.Column(db.Integer, db.ForeignKey('assigned_coachings.id', name='fk_coachings_assigned_coaching'), nullable=True)
 
     team = db.relationship('Team', foreign_keys=[team_id])
 
@@ -222,5 +221,39 @@ class Workshop(db.Model):
 
     def __repr__(self):
         return f'<Workshop {self.id}: {self.title}>'
+
+
+class AssignedCoaching(db.Model):
+    __tablename__ = 'assigned_coachings'
+    id = db.Column(db.Integer, primary_key=True)
+    project_leader_id = db.Column(db.Integer, db.ForeignKey('users.id', name='fk_assigned_coachings_project_leader'), nullable=False)
+    coach_id = db.Column(db.Integer, db.ForeignKey('users.id', name='fk_assigned_coachings_coach'), nullable=False)
+    team_member_id = db.Column(db.Integer, db.ForeignKey('team_members.id', name='fk_assigned_coachings_team_member'), nullable=False)
+    deadline = db.Column(db.DateTime, nullable=False)
+    expected_coaching_count = db.Column(db.Integer, nullable=False, default=1)
+    desired_performance_note = db.Column(db.Integer, nullable=True)
+    current_performance_note_at_assign = db.Column(db.Float, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default='pending')
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    project_leader = db.relationship('User', foreign_keys=[project_leader_id], backref='assigned_coachings_as_pl')
+    coach = db.relationship('User', foreign_keys=[coach_id], backref='assigned_coachings_as_coach')
+    team_member = db.relationship('TeamMember', backref='assigned_coachings')
+    coachings = db.relationship('Coaching', backref='assigned_coaching', lazy='dynamic')
+
+    @property
+    def progress(self):
+        completed = self.coachings.count()
+        if self.expected_coaching_count == 0:
+            return 0
+        return min(100, int((completed / self.expected_coaching_count) * 100))
+
+    @property
+    def is_overdue(self):
+        return datetime.now(timezone.utc) > self.deadline and self.status not in ['completed', 'expired']
+
+    def __repr__(self):
+        return f'<AssignedCoaching {self.id} to {self.coach.username} for {self.team_member.name}>'
 
 print("<<<< ENDE models.py (ARCHIV-HISTORIE) GELADEN >>>>")
