@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('#team_member_id').change(function() {
+        var memberId = $(this).val();
+        if (memberId) {
+            $.getJSON("{{ url_for('main.get_member_current_score') }}", { member_id: memberId }, function(data) {
+                $('#current_note_display').text(data.score + '%');
+                $('#current_note_hidden').val(data.score);
+            });
+        } else {
+            $('#current_note_display').text('N/A');
+            $('#current_note_hidden').val('');
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header telekom-bg-magenta text-white">
+                <h2>Neue Coaching-Aufgabe zuweisen</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="form-group">
+                        {{ form.coach_id.label(class="form-control-label") }}
+                        {{ form.coach_id(class="form-control custom-select " + ("is-invalid" if form.coach_id.errors else "")) }}
+                        {% if form.coach_id.errors %}
+                            <div class="invalid-feedback">{% for error in form.coach_id.errors %}{{ error }}{% endfor %}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.team_member_id.label(class="form-control-label") }}
+                        {{ form.team_member_id(class="form-control custom-select " + ("is-invalid" if form.team_member_id.errors else "")) }}
+                        {% if form.team_member_id.errors %}
+                            <div class="invalid-feedback">{% for error in form.team_member_id.errors %}{{ error }}{% endfor %}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">Aktuelle Performance Note: <span id="current_note_display">N/A</span></small>
+                        <input type="hidden" id="current_note_hidden" name="current_note">
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.deadline.label(class="form-control-label") }}
+                        {{ form.deadline(class="form-control " + ("is-invalid" if form.deadline.errors else ""), placeholder="YYYY-MM-DD HH:MM") }}
+                        {% if form.deadline.errors %}
+                            <div class="invalid-feedback">{% for error in form.deadline.errors %}{{ error }}{% endfor %}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">Format: Jahr-Monat-Tag Stunde:Minute (z.B. 2026-12-31 23:59)</small>
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.expected_coaching_count.label(class="form-control-label") }}
+                        {{ form.expected_coaching_count(class="form-control " + ("is-invalid" if form.expected_coaching_count.errors else ""), min=1, max=50) }}
+                        {% if form.expected_coaching_count.errors %}
+                            <div class="invalid-feedback">{% for error in form.expected_coaching_count.errors %}{{ error }}{% endfor %}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.desired_performance_note.label(class="form-control-label") }}
+                        {{ form.desired_performance_note(class="form-control " + ("is-invalid" if form.desired_performance_note.errors else ""), placeholder="Optional (0-10)") }}
+                        {% if form.desired_performance_note.errors %}
+                            <div class="invalid-feedback">{% for error in form.desired_performance_note.errors %}{{ error }}{% endfor %}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        {{ form.submit(class="btn telekom-button") }}
+                        <a href="{{ url_for('main.assigned_coachings') }}" class="btn btn-secondary">Abbrechen</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
