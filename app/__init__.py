@@ -94,7 +94,7 @@ def create_app(config_class=Config):
             conn.commit()
             print("✅ Tabelle 'user_projects' erstellt.")
 
-            # 5. Für alle bestehenden Abteilungsleiter die Zuordnung zum aktuellen Projekt eintragen
+            # Für alle bestehenden Abteilungsleiter die Zuordnung zum aktuellen Projekt eintragen
             res = conn.execute(text("SELECT id, project_id FROM users WHERE role = 'Abteilungsleiter' AND project_id IS NOT NULL"))
             rows = res.fetchall()
             for user_id, project_id in rows:
@@ -107,7 +107,7 @@ def create_app(config_class=Config):
         else:
             print("✅ Tabelle 'user_projects' existiert bereits.")
 
-        # 6. Optional: Bei vorhandener Tabelle trotzdem noch fehlende Zuordnungen nachholen
+        # 5. Fehlende Zuordnungen nachholen
         res = conn.execute(text("""
             SELECT u.id, u.project_id
             FROM users u
@@ -124,6 +124,48 @@ def create_app(config_class=Config):
         conn.commit()
         if rows:
             print(f"ℹ️ {len(rows)} zusätzliche Abteilungsleiter-Zuordnungen in user_projects nachgetragen.")
+
+        # ========== NEW: assigned_coachings table ==========
+        # 6. Create assigned_coachings table if not exists
+        if 'assigned_coachings' not in inspector.get_table_names():
+            print("⚠️ Tabelle 'assigned_coachings' fehlt – wird erstellt...")
+            conn.execute(text('''
+                CREATE TABLE assigned_coachings (
+                    id INTEGER NOT NULL,
+                    project_leader_id INTEGER NOT NULL,
+                    coach_id INTEGER NOT NULL,
+                    team_member_id INTEGER NOT NULL,
+                    deadline TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+                    expected_coaching_count INTEGER NOT NULL,
+                    desired_performance_note INTEGER,
+                    current_performance_note_at_assign FLOAT,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(project_leader_id) REFERENCES users(id),
+                    FOREIGN KEY(coach_id) REFERENCES users(id),
+                    FOREIGN KEY(team_member_id) REFERENCES team_members(id)
+                )
+            '''))
+            conn.commit()
+            print("✅ Tabelle 'assigned_coachings' erstellt.")
+
+            # Create index on status
+            conn.execute(text('CREATE INDEX ix_assigned_coachings_status ON assigned_coachings (status)'))
+            conn.commit()
+        else:
+            print("✅ Tabelle 'assigned_coachings' existiert bereits.")
+
+        # 7. Add assigned_coaching_id to coachings table if not exists
+        columns_coachings = [col['name'] for col in inspector.get_columns('coachings')]
+        if 'assigned_coaching_id' not in columns_coachings:
+            print("⚠️ Spalte 'assigned_coaching_id' in coachings fehlt – wird hinzugefügt...")
+            conn.execute(text('ALTER TABLE coachings ADD COLUMN assigned_coaching_id INTEGER REFERENCES assigned_coachings(id)'))
+            conn.commit()
+            print("✅ Spalte 'assigned_coaching_id' in coachings hinzugefügt.")
+        else:
+            print("✅ Spalte 'assigned_coaching_id' in coachings existiert bereits.")
 
         print("--- Migration abgeschlossen ---")
 
@@ -160,6 +202,18 @@ def create_app(config_class=Config):
         else:
             projects = []
         return {'user_allowed_projects': projects}
+
+    # Kontextprozessor für die Anzahl ausstehender zugewiesener Coachings (für Badge)
+    @app.context_processor
+    def inject_assigned_count():
+        from app.roles import ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_PROJEKTLEITER
+        if current_user.is_authenticated and current_user.role not in [ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_PROJEKTLEITER]:
+            # Nur für Coaches (alle anderen Rollen, die coachen können)
+            from app.models import AssignedCoaching
+            count = AssignedCoaching.query.filter_by(coach_id=current_user.id, status='pending').count()
+        else:
+            count = 0
+        return {'pending_assigned_count': count}
 
     # Benutzerdefinierter Jinja-Filter für Athener Zeit
     @app.template_filter('athens_time')
