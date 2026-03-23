@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Bericht zu Coaching-Aufgabe #{{ report.assignment.id }}</h2>
+    <div class="card mb-4">
+        <div class="card-header telekom-bg-magenta text-white">
+            Basis-Informationen
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Coach:</strong> {{ report.assignment.coach.username }}<br>
+                    <strong>Teammitglied:</strong> {{ report.assignment.team_member.name }} (Team: {{ report.assignment.team_member.team.name }})<br>
+                    <strong>Deadline:</strong> {{ report.assignment.deadline|athens_time('%d.%m.%Y %H:%M') }}<br>
+                    <strong>Erwartete Coachings:</strong> {{ report.coachings_expected }}<br>
+                    <strong>Durchgeführte Coachings:</strong> {{ report.coachings_done }}
+                </div>
+                <div class="col-md-6">
+                    <strong>Start-Ø-Note:</strong> {{ report.start_note|round(1) if report.start_note else 'N/A' }}%<br>
+                    <strong>Ziel-Note:</strong> {{ report.target_note }}/10 ({{ report.target_note*10 if report.target_note else 'N/A' }}%)<br>
+                    <strong>End-Ø-Note:</strong> {{ report.final_avg_score|round(1) }}%<br>
+                    <strong>Status:</strong> {{ report.status }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if report.coachings %}
+    <div class="card">
+        <div class="card-header telekom-bg-magenta text-white">
+            Durchgeführte Coachings
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Coach</th>
+                        <th>Thema</th>
+                        <th>Note</th>
+                        <th>Score (%)</th>
+                    </thead>
+                <tbody>
+                    {% for coaching in report.coachings %}
+                    <tr>
+                        <td>{{ coaching.coaching_date|athens_time('%d.%m.%Y %H:%M') }}</td>
+                        <td>{{ coaching.coach.username }}</td>
+                        <td>{{ coaching.coaching_subject }}</td>
+                        <td>{{ coaching.performance_mark }}/10</td>
+                        <td>{{ coaching.overall_score }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <p class="text-muted">Es wurden noch keine Coachings für diese Aufgabe durchgeführt.</p>
+    {% endif %}
+
+    <div class="mt-3">
+        <a href="{{ url_for('main.assigned_coachings') }}" class="btn btn-secondary">Zurück</a>
+    </div>
+</div>
+{% endblock %}
