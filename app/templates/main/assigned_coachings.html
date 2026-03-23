@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+<style>
+    .assignment-card {
+        background-color: #2b2b2b;
+        border: 1px solid #444;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        padding: 15px;
+    }
+    .assignment-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 8px;
+    }
+    .assignment-status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+    .status-pending { background-color: #ffc107; color: #212529; }
+    .status-accepted { background-color: #17a2b8; color: white; }
+    .status-in_progress { background-color: #007bff; color: white; }
+    .status-completed { background-color: #28a745; color: white; }
+    .status-expired { background-color: #6c757d; color: white; }
+    .status-rejected { background-color: #dc3545; color: white; }
+    .progress {
+        background-color: #5a6268;
+        height: 10px;
+        margin-top: 10px;
+    }
+    .progress-bar {
+        background-color: #e20074;
+    }
+    .deadline-overdue {
+        color: #dc3545;
+        font-weight: bold;
+    }
+    .btn-group {
+        margin-top: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2>Zugewiesene Coachings</h2>
+    {% if view_type == 'pl' %}
+        <p>Hier sehen Sie die von Ihnen erstellten Coaching-Aufgaben.</p>
+        <a href="{{ url_for('main.create_assigned_coaching') }}" class="btn telekom-button mb-3">Neue Coaching-Aufgabe</a>
+    {% else %}
+        <p>Hier sehen Sie die Ihnen zugewiesenen Coaching-Aufgaben. Sie können diese annehmen oder ablehnen.</p>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-12">
+            {% for assignment in assignments.items %}
+            <div class="assignment-card">
+                <div class="assignment-header">
+                    <div>
+                        <strong>{{ assignment.team_member.name }}</strong> (Team: {{ assignment.team_member.team.name }})
+                        {% if view_type == 'pl' %}
+                            <span class="badge badge-secondary ml-2">Coach: {{ assignment.coach.username }}</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span class="assignment-status status-{{ assignment.status }}">{{ assignment.status|replace('_',' ') }}</span>
+                        {% if assignment.is_overdue and assignment.status not in ['completed','expired'] %}
+                            <span class="deadline-overdue ml-2">Überfällig!</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div>
+                    <div>Deadline: {{ assignment.deadline|athens_time('%d.%m.%Y %H:%M') }}</div>
+                    <div>Erwartete Coachings: {{ assignment.expected_coaching_count }}</div>
+                    <div>Gewünschte Note: {{ assignment.desired_performance_note or 'Keine Vorgabe' }}/10</div>
+                    <div>Aktuelle Durchschnittsnote (bei Zuweisung): {{ assignment.current_performance_note_at_assign|round(1) or 'N/A' }}%</div>
+                    <div>Fortschritt: {{ assignment.progress }}% ({{ assignment.coachings.count() }}/{{ assignment.expected_coaching_count }})</div>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: {{ assignment.progress }}%;" aria-valuenow="{{ assignment.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    {% if view_type == 'coach' and assignment.status == 'pending' %}
+                        <form action="{{ url_for('main.accept_assigned_coaching', assignment_id=assignment.id) }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-success">Annehmen</button>
+                        </form>
+                        <form action="{{ url_for('main.reject_assigned_coaching', assignment_id=assignment.id) }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-danger">Ablehnen</button>
+                        </form>
+                    {% endif %}
+                    {% if view_type == 'pl' and assignment.status == 'completed' %}
+                        <a href="{{ url_for('main.assigned_coaching_report', assignment_id=assignment.id) }}" class="btn btn-sm btn-info">Bericht anzeigen</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <p class="text-center">Keine zugewiesenen Coachings gefunden.</p>
+            {% endfor %}
+
+            <!-- Pagination -->
+            <nav aria-label="Assignment Navigation">
+                <ul class="pagination justify-content-center">
+                    {% if assignments.has_prev %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('main.assigned_coachings', page=assignments.prev_num) }}">Vorherige</a></li>
+                    {% endif %}
+                    {% for page_num in assignments.iter_pages() %}
+                        {% if page_num %}
+                            <li class="page-item {% if assignments.page == page_num %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('main.assigned_coachings', page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if assignments.has_next %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('main.assigned_coachings', page=assignments.next_num) }}">Nächste</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
