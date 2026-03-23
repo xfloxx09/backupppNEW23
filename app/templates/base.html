@@ -25,6 +25,17 @@
                     {% if current_user.role in ['Projektleiter', 'Qualitätsmanager', 'Abteilungsleiter', 'Admin', 'Betriebsleiter'] %} 
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('main.pl_qm_dashboard') }}">Teams</a></li> 
                     {% endif %}
+                    <!-- Zugewiesene Coachings -->
+                    {% if current_user.is_authenticated and current_user.role in ['Projektleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Teamleiter', 'Admin', 'Betriebsleiter', 'Abteilungsleiter'] %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('main.assigned_coachings') }}">
+                                <i class="fas fa-tasks"></i> Zugewiesene Coachings
+                                {% if pending_assigned_count > 0 %}
+                                    <span class="badge badge-danger">{{ pending_assigned_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                    {% endif %}
                     {% if current_user.role in ['Admin', 'Betriebsleiter'] %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -42,23 +53,6 @@
             </ul>
             <ul class="navbar-nav">
                 {% if current_user.is_authenticated %}
-                    <!-- Project Switcher (only if user has access to multiple projects) -->
-                    {% if user_allowed_projects and user_allowed_projects|length > 1 %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="projectDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            <i class="fas fa-project-diagram"></i> Projekt
-                        </a>
-                        <div class="dropdown-menu" aria-labelledby="projectDropdown">
-                            {% for p in user_allowed_projects %}
-                                <a class="dropdown-item" href="{{ url_for('main.set_project', project_id=p.id) }}">
-                                    {{ p.name }}
-                                    {% if session.get('active_project') == p.id %} <i class="fas fa-check"></i>{% endif %}
-                                </a>
-                            {% endfor %}
-                        </div>
-                    </li>
-                    {% endif %}
-
                     <!-- "Jetzt coachen" Button -->
                     {% if current_user.role in ['Teamleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Admin', 'Betriebsleiter'] %}
                         <li class="nav-item dropdown mr-2">
