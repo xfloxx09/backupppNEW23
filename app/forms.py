@@ -202,7 +202,6 @@ class ProjectForm(FlaskForm):
     description = TextAreaField('Beschreibung', validators=[Length(max=500)])
     submit = SubmitField('Projekt speichern')
 
-# ========== NEW FORM ==========
 class AssignedCoachingForm(FlaskForm):
     coach_id = SelectField('Coach', coerce=int, validators=[DataRequired("Coach ist erforderlich.")], choices=[])
     team_member_id = SelectField('Teammitglied', coerce=int, validators=[DataRequired("Teammitglied ist erforderlich.")], choices=[])
@@ -220,7 +219,7 @@ class AssignedCoachingForm(FlaskForm):
             self.coach_id.choices = [(u.id, f"{u.username} ({u.role})") for u in coaches]
 
             # Team members: from the given project, excluding archiv
-            # Use relationship to avoid ambiguous foreign key
+            # Use explicit relationship to avoid ambiguous foreign keys
             members = TeamMember.query.join(TeamMember.team).filter(
                 Team.project_id == project_id,
                 Team.name != ARCHIV_TEAM_NAME
