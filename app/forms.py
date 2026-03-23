@@ -220,5 +220,9 @@ class AssignedCoachingForm(FlaskForm):
             self.coach_id.choices = [(u.id, f"{u.username} ({u.role})") for u in coaches]
 
             # Team members: from the given project, excluding archiv
-            members = TeamMember.query.join(Team).filter(Team.project_id == project_id, Team.name != ARCHIV_TEAM_NAME).order_by(TeamMember.name).all()
+            # Use relationship to avoid ambiguous foreign key
+            members = TeamMember.query.join(TeamMember.team).filter(
+                Team.project_id == project_id,
+                Team.name != ARCHIV_TEAM_NAME
+            ).order_by(TeamMember.name).all()
             self.team_member_id.choices = [(m.id, f"{m.name} ({m.team.name})") for m in members]
