@@ -96,8 +96,8 @@
     border-color: #e20074;
     color: white;
 }
-/* NEW: wrap long text in tables and detail boxes */
-.table td, .table th {
+/* Only wrap the notes column (10th column) and the detail notes box */
+.table td:nth-child(10) {
     word-break: break-word;
     white-space: normal;
 }
@@ -281,41 +281,41 @@
         <tbody>
             {% for coaching in coachings_paginated.items %}
              …
-                 <td>{{ coaching.coaching_date|athens_time }}</td>
-                 <td>{{ coaching.team_member_coached.name if coaching.team_member_coached else 'N/A' }}</td>
-                 <td>{{ coaching.team_member_coached.team.name if coaching.team_member_coached and coaching.team_member_coached.team else 'N/A' }}</td>
-                 <td>{{ coaching.coach.username if coaching.coach else 'N/A' }}</td>
-                 <td>{{ coaching.coaching_subject if coaching.coaching_subject else '-' }}</td>
-                 <td>{{ coaching.coaching_style if coaching.coaching_style else '-' }}</td>
-                 <td>{{ coaching.performance_mark if coaching.performance_mark is not none else '-'}}</td>
-                 <td>{{ coaching.time_spent if coaching.time_spent is not none else '-' }}</td>
-                 <td>
+                  <td>{{ coaching.coaching_date|athens_time }}</td>
+                  <td>{{ coaching.team_member_coached.name if coaching.team_member_coached else 'N/A' }}</td>
+                  <td>{{ coaching.team_member_coached.team.name if coaching.team_member_coached and coaching.team_member_coached.team else 'N/A' }}</td>
+                  <td>{{ coaching.coach.username if coaching.coach else 'N/A' }}</td>
+                  <td>{{ coaching.coaching_subject if coaching.coaching_subject else '-' }}</td>
+                  <td>{{ coaching.coaching_style if coaching.coaching_style else '-' }}</td>
+                  <td>{{ coaching.performance_mark if coaching.performance_mark is not none else '-'}}</td>
+                  <td>{{ coaching.time_spent if coaching.time_spent is not none else '-' }}</td>
+                  <td>
                     <div class="progress" style="min-width: 100px;">
                         <div class="progress-bar telekom-progress-bar" role="progressbar" style="width: {{ coaching.overall_score }}%;" aria-valuenow="{{ coaching.overall_score }}" aria-valuemin="0" aria-valuemax="100">
                             {{ coaching.overall_score }}%
                         </div>
                     </div>
-                 </td>
-                 <td>
+                  </td>
+                  <td>
                     {% if coaching.project_leader_notes %}
                         {{ coaching.project_leader_notes[:30] }}{% if coaching.project_leader_notes|length > 30 %}...{% endif %}
                     {% else %}
                         -
                     {% endif %}
-                 </td>
-                 <td>
+                  </td>
+                  <td>
                     <button class="btn-icon-circle" type="button" data-toggle="collapse" data-target="#coachingDetails{{ coaching.id }}" aria-expanded="false" aria-controls="coachingDetails{{ coaching.id }}" title="Details anzeigen">
                         <i class="fas fa-info"></i>
                     </button>
-                 </td>
-                 <td>
+                  </td>
+                  <td>
                     {% if current_user.id == coaching.coach_id or current_user.role == config.ROLE_ADMIN %}
                     <a href="{{ url_for('main.edit_coaching', coaching_id=coaching.id, next=request.url) }}" class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
                         <i class="fas fa-edit"></i>
                     </a>
                     {% endif %}
-                 </td>
-             </tr>
+                  </td>
+              </tr>
             <tr class="collapse" id="coachingDetails{{ coaching.id }}">
                 <td colspan="12">
                     <div class="detail-card">
@@ -359,11 +359,11 @@
                         </div>
                         {% endif %}
                     </div>
-                 </td>
-             </tr>
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
-     </table>
+    </table>
 </div>
 
 <nav aria-label="Coaching Navigation" class="mt-4">
