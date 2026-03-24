@@ -4,51 +4,6 @@
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
 $(document).ready(function() {
-    // When coach changes, load members grouped by team
-    $('#coach_id').change(function() {
-        var coachId = $(this).val();
-        var teamMemberSelect = $('#team_member_id');
-        if (coachId) {
-            teamMemberSelect.html('<option value="">Lade Mitglieder...</option>');
-            var url = "{{ url_for('main.api_coach_team_members', coach_id=0) }}".replace('0', coachId);
-            var projectFilter = "{{ current_project_filter or '' }}";
-            if (projectFilter) {
-                url += "?project=" + projectFilter;
-            }
-            $.getJSON(url)
-                .done(function(data) {
-                    // Group members by team
-                    var grouped = {};
-                    $.each(data, function(i, member) {
-                        if (!grouped[member.team_name]) {
-                            grouped[member.team_name] = [];
-                        }
-                        grouped[member.team_name].push(member);
-                    });
-                    var options = '<option value="">-- Bitte wählen --</option>';
-                    $.each(grouped, function(teamName, members) {
-                        options += '<optgroup label="' + teamName + '">';
-                        $.each(members, function(j, member) {
-                            options += '<option value="' + member.id + '">' + member.name + '</option>';
-                        });
-                        options += '</optgroup>';
-                    });
-                    teamMemberSelect.html(options);
-                })
-                .fail(function(jqXHR, textStatus, errorThrown) {
-                    console.error("AJAX error:", textStatus, errorThrown);
-                    console.error("Status code:", jqXHR.status);
-                    console.error("Response text:", jqXHR.responseText);
-                    teamMemberSelect.html('<option value="">Fehler beim Laden der Mitglieder (siehe Konsole)</option>');
-                });
-        } else {
-            teamMemberSelect.html('<option value="">-- Bitte zuerst Coach wählen --</option>');
-        }
-        // Also reset current note display
-        $('#current_note_display').text('N/A');
-        $('#current_note_hidden').val('');
-    });
-
     // When team member changes, load current performance note
     $('#team_member_id').change(function() {
         var memberId = $(this).val();
@@ -67,6 +22,11 @@ $(document).ready(function() {
             $('#current_note_hidden').val('');
         }
     });
+
+    // If member is pre-selected (from query string), trigger change to load note
+    if ($('#team_member_id').val()) {
+        $('#team_member_id').trigger('change');
+    }
 });
 </script>
 {% endblock %}
@@ -93,7 +53,19 @@ $(document).ready(function() {
                     <div class="form-group">
                         {{ form.team_member_id.label(class="form-control-label") }}
                         <select name="team_member_id" id="team_member_id" class="form-control custom-select" required>
-                            <option value="">-- Bitte zuerst Coach wählen --</option>
+                            <option value="">-- Bitte wählen --</option>
+                            {% set ns = namespace(prev_team='') %}
+                            {% for value, label in form.team_member_id.choices %}
+                                {% set team_name = label.split('(')[-1].rstrip(')') if '(' in label else '' %}
+                                {% set member_name = label.split(' (')[0] %}
+                                {% if team_name != ns.prev_team %}
+                                    {% if not loop.first %}</optgroup>{% endif %}
+                                    <optgroup label="{{ team_name }}">
+                                {% endif %}
+                                <option value="{{ value }}" {% if form.team_member_id.data == value %}selected{% endif %}>{{ member_name }}</option>
+                                {% set ns.prev_team = team_name %}
+                                {% if loop.last %}</optgroup>{% endif %}
+                            {% endfor %}
                         </select>
                         {% if form.team_member_id.errors %}
                             <div class="invalid-feedback d-block">{% for error in form.team_member_id.errors %}{{ error }}{% endfor %}</div>
