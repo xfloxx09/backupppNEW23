@@ -24,7 +24,7 @@
                 <a href="{{ url_for('main.assigned_coachings') }}" class="btn btn-lg btn-block p-5" style="background-color: #28a745; color: white; border-radius: 20px; text-decoration: none; height: 280px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative;">
                     <i class="fas fa-tasks" style="font-size: 5rem; margin-bottom: 20px;"></i>
                     <h2>To-Do</h2>
-                    <p>Zugewiesene Coachings einsehen und verwalten</p>
+                    <p>Zugewiesene Coachings</p>
                     {% if pending_assigned_count > 0 %}
                     <span class="badge badge-danger" style="position: absolute; top: 15px; right: 25px; font-size: 1.2rem; border-radius: 50%; padding: 8px 12px;">{{ pending_assigned_count }}</span>
                     {% endif %}
