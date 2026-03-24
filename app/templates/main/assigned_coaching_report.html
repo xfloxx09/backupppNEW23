@@ -46,17 +46,18 @@
             <div class="table-responsive">
                 <table class="table table-striped">
                     <thead>
-                         …
+                        <tr>
                             <th>Datum</th>
                             <th>Coach</th>
                             <th>Thema</th>
                             <th>Note</th>
                             <th>Score (%)</th>
                             <th>Notizen des Coaches</th>
-                        </thead>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for coaching in report.coachings %}
-                         …
+                        <tr>
                             <td>{{ coaching.coaching_date|athens_time('%d.%m.%Y %H:%M') }}</td>
                             <td>{{ coaching.coach.username }}</td>
                             <td>{{ coaching.coaching_subject }}</td>
@@ -80,7 +81,7 @@
                                     -
                                 {% endif %}
                             </td>
-                         </tr>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
