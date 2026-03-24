@@ -834,35 +834,37 @@ def assigned_coachings():
     page = request.args.get('page', 1, type=int)
     project_filter = get_visible_project_id()
 
+    # Determine view type based on role
+    # PL view: Admin, Betriebsleiter, Projektleiter
     if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_PROJEKTLEITER]:
+        view_type = 'pl'
         if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
             query = AssignedCoaching.query
         else:
             query = AssignedCoaching.query.filter_by(project_leader_id=current_user.id)
+        # Apply project filter for PL view
+        if project_filter:
+            query = query.join(AssignedCoaching.team_member).join(TeamMember.team).filter(Team.project_id == project_filter)
     else:
+        # Coach view: any other role that can coach (Teamleiter, QM, SalesCoach, Trainer, etc.)
+        view_type = 'coach'
         query = AssignedCoaching.query.filter_by(coach_id=current_user.id)
-
-    if project_filter:
-        # Fix ambiguous join: explicitly join through relationships
-        query = query.join(AssignedCoaching.team_member).join(TeamMember.team).filter(Team.project_id == project_filter)
+        # No project filter for coaches – they see all assigned coachings regardless of project
 
     assignments = query.order_by(AssignedCoaching.deadline.asc(), AssignedCoaching.created_at.desc()).paginate(page=page, per_page=10, error_out=False)
 
-    view_type = 'pl' if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_PROJEKTLEITER] else 'coach'
-
-    all_projects = None
+    # Prepare projects for filter dropdown (only for PL view)
+    all_projects = []
     if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
         all_projects = Project.query.order_by(Project.name).all()
     elif current_user.role == ROLE_ABTEILUNGSLEITER:
         all_projects = current_user.projects.order_by(Project.name).all()
-    else:
-        all_projects = [Project.query.get(project_filter)] if project_filter else []
 
     return render_template('main/assigned_coachings.html',
                            assignments=assignments,
                            view_type=view_type,
                            all_projects=all_projects,
-                           current_project_filter=project_filter,
+                           current_project_filter=project_filter if view_type == 'pl' else None,
                            config=current_app.config)
 
 
