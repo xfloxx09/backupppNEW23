@@ -261,6 +261,20 @@ def create_app(config_class=Config):
             except:
                 return str(utc_dt)
 
+    # NEU: Filter für Status-Übersetzung ins Deutsche
+    @app.template_filter('status_de')
+    def translate_status(status):
+        translations = {
+            'pending': 'Ausstehend',
+            'accepted': 'Angenommen',
+            'in_progress': 'In Bearbeitung',
+            'completed': 'Abgeschlossen',
+            'expired': 'Abgelaufen',
+            'rejected': 'Abgelehnt',
+            'cancelled': 'Storniert'
+        }
+        return translations.get(status, status)
+
     try:
         os.makedirs(app.instance_path)
     except OSError:
