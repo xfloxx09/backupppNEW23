@@ -129,7 +129,6 @@ def create_app(config_class=Config):
         # 6. Create assigned_coachings table if not exists
         if 'assigned_coachings' not in inspector.get_table_names():
             print("⚠️ Tabelle 'assigned_coachings' fehlt – wird erstellt...")
-            # Use SERIAL for auto-increment id
             conn.execute(text('''
                 CREATE TABLE assigned_coachings (
                     id SERIAL NOT NULL,
@@ -158,9 +157,6 @@ def create_app(config_class=Config):
         else:
             print("✅ Tabelle 'assigned_coachings' existiert bereits.")
             # Ensure id column has auto-increment (if table was created without SERIAL)
-            # Check if id column uses a sequence
-            # We'll attempt to add a sequence and set default if needed
-            # This is idempotent and safe for existing tables
             conn.execute(text('''
                 DO $$
                 BEGIN
