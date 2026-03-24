@@ -6,7 +6,7 @@ from app.models import User, Team, TeamMember, Coaching, Workshop, workshop_part
 from app.forms import CoachingForm, ProjectLeaderNoteForm, PasswordChangeForm, WorkshopForm, AssignedCoachingForm
 from app.utils import role_required, ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_PROJEKTLEITER, ROLE_QM, ROLE_SALESCOACH, ROLE_TRAINER, ROLE_TEAMLEITER, ROLE_ABTEILUNGSLEITER, ARCHIV_TEAM_NAME
 from sqlalchemy import desc, func, or_, and_
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 import sqlalchemy
 from calendar import monthrange
 
@@ -909,11 +909,15 @@ def create_assigned_coaching():
         if member_coachings:
             current_avg_score = sum(c.overall_score for c in member_coachings) / len(member_coachings)
 
+        # Convert date to datetime at end of day
+        deadline_date = form.deadline.data
+        deadline_datetime = datetime.combine(deadline_date, time(23, 59, 59))
+
         assigned = AssignedCoaching(
             project_leader_id=current_user.id,
             coach_id=form.coach_id.data,
             team_member_id=form.team_member_id.data,
-            deadline=form.deadline.data,
+            deadline=deadline_datetime,
             expected_coaching_count=form.expected_coaching_count.data,
             desired_performance_note=form.desired_performance_note.data,
             current_performance_note_at_assign=current_avg_score,
