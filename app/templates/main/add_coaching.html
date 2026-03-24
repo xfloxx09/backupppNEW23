@@ -2,7 +2,6 @@
 
 {% block head_extra %}
 <style>
-    /* Eigene Stile für das Formular */
     .form-section {
         background-color: #2b2b2b;
         border-radius: 8px;
@@ -99,11 +98,9 @@
     .leitfaden-btn:hover {
         transform: scale(1.1);
     }
-    /* Ursprüngliche Select-Felder ausblenden */
     .leitfaden-select {
         display: none;
     }
-    /* Schieberegler Design */
     input[type=range] {
         -webkit-appearance: none;
         width: 100%;
@@ -207,7 +204,17 @@
             </div>
         </div>
 
-        <!-- Abschnitt 2: Leitfaden-Checkliste -->
+        <!-- Abschnitt 2: Zugewiesene Aufgabe (nur für Coaches) -->
+        <div class="form-section">
+            <h4 class="section-title"><i class="fas fa-tasks"></i> Zugewiesene Aufgabe (optional)</h4>
+            <div class="form-group">
+                {{ form.assigned_coaching_id.label(class="form-control-label") }}
+                {{ form.assigned_coaching_id(class="form-control custom-select") }}
+                <small class="form-text text-muted">Wenn Sie eine zugewiesene Aufgabe erfüllen, wählen Sie diese hier aus. Der Fortschritt wird automatisch aktualisiert.</small>
+            </div>
+        </div>
+
+        <!-- Abschnitt 3: Leitfaden-Checkliste -->
         <div class="form-section">
             <h4 class="section-title"><i class="fas fa-check-circle"></i> Leitfaden-Checkliste</h4>
             <p class="text-muted mb-3">Klicken Sie auf die entsprechenden Icons, um den Status festzulegen.</p>
@@ -225,7 +232,7 @@
             {% endfor %}
         </div>
 
-        <!-- Abschnitt 3: Bewertung & Zeitaufwand -->
+        <!-- Abschnitt 4: Bewertung & Zeitaufwand -->
         <div class="form-section">
             <h4 class="section-title"><i class="fas fa-star"></i> Bewertung & Zeitaufwand</h4>
             <div class="form-row">
@@ -251,7 +258,7 @@
             </div>
         </div>
 
-        <!-- Abschnitt 4: Notizen -->
+        <!-- Abschnitt 5: Notizen -->
         <div class="form-section">
             <h4 class="section-title"><i class="fas fa-pen"></i> Notizen</h4>
             <div class="form-group">
@@ -308,30 +315,21 @@ document.addEventListener('DOMContentLoaded', function() {
             const select = document.getElementById(fieldId);
             if (select) {
                 select.value = value;
-                // Alle Buttons dieser Gruppe deaktivieren
                 const parentDiv = this.closest('.leitfaden-buttons');
                 parentDiv.querySelectorAll('.leitfaden-btn').forEach(b => b.classList.remove('active'));
-                // Aktiven Button markieren
                 this.classList.add('active');
-                
-                // Kurzer visueller Feedback-Effekt (optional)
                 this.style.transform = 'scale(1.2)';
-                setTimeout(() => {
-                    this.style.transform = '';
-                }, 150);
+                setTimeout(() => { this.style.transform = ''; }, 150);
             }
         });
     });
 
-    // Initial aktive Buttons setzen basierend auf vorhandenen Werten
     document.querySelectorAll('.leitfaden-select').forEach(select => {
         const fieldId = select.id;
         const value = select.value;
         if (value) {
             const activeBtn = document.querySelector(`.leitfaden-btn[data-field="${fieldId}"][data-value="${value}"]`);
-            if (activeBtn) {
-                activeBtn.classList.add('active');
-            }
+            if (activeBtn) activeBtn.classList.add('active');
         }
     });
 
@@ -345,7 +343,6 @@ document.addEventListener('DOMContentLoaded', function() {
             hiddenInput.value = val;
             display.textContent = val;
         });
-        // Initialwert setzen
         if (hiddenInput.value) {
             slider.value = hiddenInput.value;
             display.textContent = hiddenInput.value;
@@ -356,7 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- 4. Optional: Zeitaufwand auf ganze Minuten beschränken ---
+    // --- 4. Zeitaufwand auf ganze Minuten ---
     const timeInput = document.getElementById('time_spent_input');
     if (timeInput) {
         timeInput.addEventListener('blur', function() {
@@ -364,6 +361,31 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isNaN(val) || val < 1) val = 1;
             this.value = val;
         });
+    }
+
+    // --- 5. Zugewiesene Aufgaben dynamisch laden ---
+    const memberSelect = document.getElementById('team_member_id');
+    const assignmentSelect = document.getElementById('assigned_coaching_id');
+    if (memberSelect && assignmentSelect) {
+        function loadAssignments() {
+            const memberId = memberSelect.value;
+            if (!memberId) {
+                assignmentSelect.innerHTML = '<option value="0">--- Keine zugewiesene Aufgabe ---</option>';
+                return;
+            }
+            fetch(`/api/available_assignments?member_id=${memberId}`)
+                .then(response => response.json())
+                .then(data => {
+                    let options = '<option value="0">--- Keine zugewiesene Aufgabe ---</option>';
+                    data.assignments.forEach(a => {
+                        options += `<option value="${a.id}">Aufgabe #${a.id} (Deadline: ${a.deadline}) – Fortschritt: ${a.progress}%</option>`;
+                    });
+                    assignmentSelect.innerHTML = options;
+                })
+                .catch(error => console.error('Fehler beim Laden der Aufgaben:', error));
+        }
+        memberSelect.addEventListener('change', loadAssignments);
+        loadAssignments(); // initial load if member already selected
     }
 });
 </script>
