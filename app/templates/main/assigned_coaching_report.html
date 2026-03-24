@@ -2,7 +2,6 @@
 
 {% block head_extra %}
 <style>
-    /* Only wrap the notes column (6th column) */
     .table td:nth-child(6) {
         word-break: break-word;
         white-space: normal;
@@ -46,17 +45,18 @@
             <div class="table-responsive">
                 <table class="table table-striped">
                     <thead>
-                         …
+                        <tr>
                             <th>Datum</th>
                             <th>Coach</th>
                             <th>Thema</th>
                             <th>Note</th>
                             <th>Score (%)</th>
                             <th>Notizen des Coaches</th>
-                        </thead>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for coaching in report.coachings %}
-                         <tr>
+                        <tr>
                             <td>{{ coaching.coaching_date|athens_time('%d.%m.%Y %H:%M') }}</td>
                             <td>{{ coaching.coach.username }}</td>
                             <td>{{ coaching.coaching_subject }}</td>
