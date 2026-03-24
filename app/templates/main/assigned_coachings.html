@@ -98,7 +98,7 @@
                     {% endif %}
                     {% if view_type == 'pl' and assignment.status in ['pending', 'accepted', 'in_progress'] %}
                         <form action="{{ url_for('main.cancel_assigned_coaching', assignment_id=assignment.id) }}" method="POST" style="display: inline;">
-                            <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Möchten Sie diese Coaching-Aufgabe wirklich stornieren?')">Stornieren</button>
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Diese Aufgabe wirklich stornieren?');">Stornieren</button>
                         </form>
                     {% endif %}
                     {% if view_type == 'pl' and assignment.status == 'completed' %}
