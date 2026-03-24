@@ -155,6 +155,27 @@
     .tooltip-custom:hover .tooltip-text {
         visibility: visible;
     }
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+    }
+    .sortable-header:hover {
+        background-color: #3a3a3a;
+    }
+    .sort-icon {
+        margin-left: 5px;
+        font-size: 0.8rem;
+        opacity: 0.6;
+    }
+    .sort-icon.active {
+        opacity: 1;
+        color: #e20074;
+    }
+    .reset-sort-btn {
+        margin-left: 10px;
+        font-size: 0.8rem;
+        padding: 0.2rem 0.5rem;
+    }
 </style>
 {% endblock %}
 
@@ -186,16 +207,6 @@
             <p class="text-muted">Schneller Überblick über die aktuellen Durchschnittsleistungen. Klicken Sie auf "Zuweisen", um direkt eine Coaching-Aufgabe zu erstellen.</p>
 
             {% if member_performance %}
-                <!-- Sort controls for member table -->
-                <div class="row mb-3">
-                    <div class="col-md-12 text-end">
-                        <a href="#" class="btn btn-sm btn-outline-secondary" id="sortScore">Nach Score</a>
-                        <a href="#" class="btn btn-sm btn-outline-secondary" id="sortName">Nach Name</a>
-                        <a href="#" class="btn btn-sm btn-outline-secondary" id="sortTeam">Nach Team</a>
-                        <a href="#" class="btn btn-sm btn-outline-secondary" id="resetSort">Reset</a>
-                    </div>
-                </div>
-
                 <!-- Accordion by team (closed by default) -->
                 <div id="memberAccordion">
                     {% set teams = {} %}
@@ -220,17 +231,18 @@
                                     <table class="table table-striped performance-table mb-0">
                                         <thead>
                                             <tr>
-                                                <th>Mitglied</th>
-                                                <th>Gesamtscore</th>
-                                                <th>Ø Performance (%)</th>
-                                                <th>Coachings</th>
-                                                <th>Gesamtzeit (Min.)</th>
-                                                <th>Letztes Coaching</th>
+                                                <th class="sortable-header" data-sort="name">Mitglied <span class="sort-icon" data-sort="name">↕️</span></th>
+                                                <th class="sortable-header" data-sort="score">Gesamtscore <span class="sort-icon" data-sort="score">↕️</span></th>
+                                                <th class="sortable-header" data-sort="performance">Ø Performance (%) <span class="sort-icon" data-sort="performance">↕️</span></th>
+                                                <th class="sortable-header" data-sort="coachings">Coachings <span class="sort-icon" data-sort="coachings">↕️</span></th>
+                                                <th class="sortable-header" data-sort="time">Gesamtzeit (Min.) <span class="sort-icon" data-sort="time">↕️</span></th>
+                                                <th class="sortable-header" data-sort="last">Letztes Coaching <span class="sort-icon" data-sort="last">↕️</span></th>
                                                 <th>Aktion</th>
-                                             </thead>
+                                            </tr>
+                                        </thead>
                                         <tbody>
                                             {% for member in members %}
-                                            <tr data-score="{{ member.combined_score }}" data-name="{{ member.name }}" data-team="{{ member.team_name }}" data-coachings="{{ member.coaching_count }}" data-performance="{{ member.avg_score }}" data-time="{{ member.total_time }}">
+                                            <tr data-name="{{ member.name }}" data-score="{{ member.combined_score }}" data-performance="{{ member.avg_score }}" data-coachings="{{ member.coaching_count }}" data-time="{{ member.total_time }}" data-last="{{ member.last_coaching_date.isoformat() if member.last_coaching_date else '' }}">
                                                 <td>{{ member.name }}</td>
                                                 <td><strong>{{ member.combined_score|round(1) }}%</strong></td>
                                                 <td>
@@ -316,87 +328,88 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Sorting for member performance table
-    let currentSort = null;
-    let currentDir = null;
+    // --- Sorting for member performance table ---
+    let currentSortField = null;
+    let currentSortDir = null;
 
-    function sortRows(compareFn) {
+    function sortRows(field, dir) {
         document.querySelectorAll('.team-accordion tbody').forEach(tbody => {
             let rows = Array.from(tbody.querySelectorAll('tr'));
-            rows.sort(compareFn);
+            rows.sort((a, b) => {
+                let aVal, bVal;
+                switch(field) {
+                    case 'name':
+                        aVal = a.getAttribute('data-name');
+                        bVal = b.getAttribute('data-name');
+                        break;
+                    case 'score':
+                        aVal = parseFloat(a.getAttribute('data-score'));
+                        bVal = parseFloat(b.getAttribute('data-score'));
+                        break;
+                    case 'performance':
+                        aVal = parseFloat(a.getAttribute('data-performance'));
+                        bVal = parseFloat(b.getAttribute('data-performance'));
+                        break;
+                    case 'coachings':
+                        aVal = parseInt(a.getAttribute('data-coachings'));
+                        bVal = parseInt(b.getAttribute('data-coachings'));
+                        break;
+                    case 'time':
+                        aVal = parseInt(a.getAttribute('data-time'));
+                        bVal = parseInt(b.getAttribute('data-time'));
+                        break;
+                    case 'last':
+                        aVal = a.getAttribute('data-last');
+                        bVal = b.getAttribute('data-last');
+                        break;
+                    default:
+                        return 0;
+                }
+                if (aVal === bVal) return 0;
+                if (dir === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
             rows.forEach(row => tbody.appendChild(row));
         });
     }
 
-    function setSort(compareFn, label) {
-        currentSort = label;
-        currentDir = (currentDir === 'asc' ? 'desc' : 'asc');
-        sortRows(compareFn);
-        // Update button styles
-        document.querySelectorAll('.btn-outline-secondary').forEach(btn => btn.classList.remove('active'));
-        const activeBtn = document.getElementById(label + 'Sort');
-        if (activeBtn) activeBtn.classList.add('active');
+    function updateSortIcons(field, dir) {
+        document.querySelectorAll('.sort-icon').forEach(icon => {
+            icon.classList.remove('active');
+            icon.textContent = '↕️';
+        });
+        const activeIcon = document.querySelector(`.sort-icon[data-sort="${field}"]`);
+        if (activeIcon) {
+            activeIcon.classList.add('active');
+            activeIcon.textContent = dir === 'asc' ? '↑' : '↓';
+        }
     }
 
-    document.getElementById('sortScore').addEventListener('click', function(e) {
-        e.preventDefault();
-        setSort((a, b) => {
-            let scoreA = parseFloat(a.getAttribute('data-score'));
-            let scoreB = parseFloat(b.getAttribute('data-score'));
-            return currentDir === 'asc' ? scoreA - scoreB : scoreB - scoreA;
-        }, 'score');
+    function handleSort(field) {
+        if (currentSortField === field) {
+            // Toggle direction
+            currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortField = field;
+            currentSortDir = 'desc'; // default descending for scores, but we'll set based on field
+            // For text fields, default to ascending
+            if (field === 'name') currentSortDir = 'asc';
+        }
+        sortRows(currentSortField, currentSortDir);
+        updateSortIcons(currentSortField, currentSortDir);
+    }
+
+    // Attach click handlers to sortable headers
+    document.querySelectorAll('.sortable-header').forEach(header => {
+        const sortField = header.getAttribute('data-sort');
+        header.addEventListener('click', () => handleSort(sortField));
     });
-    document.getElementById('sortName').addEventListener('click', function(e) {
-        e.preventDefault();
-        setSort((a, b) => {
-            let nameA = a.getAttribute('data-name');
-            let nameB = b.getAttribute('data-name');
-            return currentDir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-        }, 'name');
-    });
-    document.getElementById('sortTeam').addEventListener('click', function(e) {
-        e.preventDefault();
-        // Re-order the accordion cards by team name
-        let accordion = document.getElementById('memberAccordion');
-        let cards = Array.from(accordion.querySelectorAll('.card'));
-        cards.sort((a, b) => {
-            let teamA = a.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
-            let teamB = b.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
-            return currentDir === 'asc' ? teamA.localeCompare(teamB) : teamB.localeCompare(teamA);
-        });
-        cards.forEach(card => accordion.appendChild(card));
-        currentSort = 'team';
-        currentDir = currentDir === 'asc' ? 'desc' : 'asc';
-        document.querySelectorAll('.btn-outline-secondary').forEach(btn => btn.classList.remove('active'));
-        document.getElementById('sortTeam').classList.add('active');
-    });
-    document.getElementById('resetSort').addEventListener('click', function(e) {
-        e.preventDefault();
-        currentSort = null;
-        currentDir = null;
-        // Reset to original order (by team, then name)
-        let accordion = document.getElementById('memberAccordion');
-        let cards = Array.from(accordion.querySelectorAll('.card'));
-        cards.sort((a, b) => {
-            let teamA = a.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
-            let teamB = b.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
-            if (teamA === teamB) {
-                let rowsA = a.querySelectorAll('tbody tr');
-                let rowsB = b.querySelectorAll('tbody tr');
-                // Not needed; just keep original order
-                return 0;
-            }
-            return teamA.localeCompare(teamB);
-        });
-        cards.forEach(card => accordion.appendChild(card));
-        // Reset rows inside each team
-        document.querySelectorAll('.team-accordion tbody').forEach(tbody => {
-            let rows = Array.from(tbody.querySelectorAll('tr'));
-            rows.sort((a, b) => a.getAttribute('data-name').localeCompare(b.getAttribute('data-name')));
-            rows.forEach(row => tbody.appendChild(row));
-        });
-        document.querySelectorAll('.btn-outline-secondary').forEach(btn => btn.classList.remove('active'));
-    });
+
+    // Optional: add a small reset button? Not needed, but we could add a text link
+    // For now, we'll let the user click the column header to change sort.
 
     // Make accordion headers toggle the collapse icon
     document.querySelectorAll('.team-accordion .card-header').forEach(header => {
