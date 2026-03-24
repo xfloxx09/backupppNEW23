@@ -10,6 +10,7 @@ $(document).ready(function() {
         var teamMemberSelect = $('#team_member_id');
         if (coachId) {
             teamMemberSelect.html('<option value="">Lade Mitglieder...</option>');
+            // Build URL with optional project filter
             var url = "{{ url_for('main.api_coach_team_members', coach_id=0) }}".replace('0', coachId);
             var projectFilter = "{{ current_project_filter or '' }}";
             if (projectFilter) {
