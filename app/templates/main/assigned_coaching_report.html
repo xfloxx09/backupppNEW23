@@ -1,5 +1,17 @@
 {% extends "base.html" %}
 
+{% block head_extra %}
+<style>
+    .table td, .table th {
+        word-break: break-word;
+        white-space: normal;
+    }
+    .table td:nth-child(6) {
+        max-width: 400px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <h2>Bericht zu Coaching-Aufgabe #{{ report.assignment.id }}</h2>
@@ -45,7 +57,7 @@
                         </thead>
                     <tbody>
                         {% for coaching in report.coachings %}
-                        <tr>
+                         <tr>
                             <td>{{ coaching.coaching_date|athens_time('%d.%m.%Y %H:%M') }}</td>
                             <td>{{ coaching.coach.username }}</td>
                             <td>{{ coaching.coaching_subject }}</td>
