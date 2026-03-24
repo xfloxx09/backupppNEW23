@@ -10,15 +10,24 @@ $(document).ready(function() {
         var teamMemberSelect = $('#team_member_id');
         if (coachId) {
             teamMemberSelect.html('<option value="">Lade Mitglieder...</option>');
-            $.getJSON("{{ url_for('main.api_coach_team_members', coach_id=0) }}".replace('0', coachId) + "?project={{ current_project_filter or '' }}", function(data) {
-                var options = '<option value="">-- Bitte wählen --</option>';
-                $.each(data, function(i, member) {
-                    options += '<option value="' + member.id + '">' + member.name + ' (' + member.team_name + ')</option>';
+            // Build URL with optional project filter
+            var url = "{{ url_for('main.api_coach_team_members', coach_id=0) }}".replace('0', coachId);
+            var projectFilter = "{{ current_project_filter or '' }}";
+            if (projectFilter) {
+                url += "?project=" + projectFilter;
+            }
+            $.getJSON(url)
+                .done(function(data) {
+                    var options = '<option value="">-- Bitte wählen --</option>';
+                    $.each(data, function(i, member) {
+                        options += '<option value="' + member.id + '">' + member.name + ' (' + member.team_name + ')</option>';
+                    });
+                    teamMemberSelect.html(options);
+                })
+                .fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error("AJAX error:", textStatus, errorThrown, jqXHR.responseText);
+                    teamMemberSelect.html('<option value="">Fehler beim Laden der Mitglieder</option>');
                 });
-                teamMemberSelect.html(options);
-            }).fail(function() {
-                teamMemberSelect.html('<option value="">Fehler beim Laden der Mitglieder</option>');
-            });
         } else {
             teamMemberSelect.html('<option value="">-- Bitte zuerst Coach wählen --</option>');
         }
@@ -31,10 +40,15 @@ $(document).ready(function() {
     $('#team_member_id').change(function() {
         var memberId = $(this).val();
         if (memberId) {
-            $.getJSON("{{ url_for('main.get_member_current_score') }}", { member_id: memberId }, function(data) {
-                $('#current_note_display').text(data.score + '%');
-                $('#current_note_hidden').val(data.score);
-            });
+            $.getJSON("{{ url_for('main.get_member_current_score') }}", { member_id: memberId })
+                .done(function(data) {
+                    $('#current_note_display').text(data.score + '%');
+                    $('#current_note_hidden').val(data.score);
+                })
+                .fail(function() {
+                    $('#current_note_display').text('Fehler');
+                    $('#current_note_hidden').val('');
+                });
         } else {
             $('#current_note_display').text('N/A');
             $('#current_note_hidden').val('');
