@@ -1042,7 +1042,7 @@ def api_coach_team_members(coach_id):
         # Determine which team members this coach can coach
         if coach.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
             # Admin/Betriebsleiter can coach any member in the project (if project filter active)
-            query = TeamMember.query.join(Team)
+            query = TeamMember.query.join(Team, TeamMember.team_id == Team.id)
             if project_filter:
                 query = query.filter(Team.project_id == project_filter)
             query = query.filter(Team.name != ARCHIV_TEAM_NAME)
@@ -1053,20 +1053,20 @@ def api_coach_team_members(coach_id):
                 allowed_project_ids = [project_filter]
             if not allowed_project_ids:
                 return jsonify([])
-            query = TeamMember.query.join(Team).filter(Team.project_id.in_(allowed_project_ids), Team.name != ARCHIV_TEAM_NAME)
+            query = TeamMember.query.join(Team, TeamMember.team_id == Team.id).filter(Team.project_id.in_(allowed_project_ids), Team.name != ARCHIV_TEAM_NAME)
         elif coach.role == ROLE_TEAMLEITER:
             # Teamleiter can coach members of teams they lead
             led_team_ids = [team.id for team in coach.teams_led]
             if not led_team_ids:
                 return jsonify([])
-            query = TeamMember.query.filter(TeamMember.team_id.in_(led_team_ids)).join(Team).filter(Team.name != ARCHIV_TEAM_NAME)
+            query = TeamMember.query.filter(TeamMember.team_id.in_(led_team_ids)).join(Team, TeamMember.team_id == Team.id).filter(Team.name != ARCHIV_TEAM_NAME)
             if project_filter:
                 # Also filter by project if PL has one selected
                 query = query.filter(Team.project_id == project_filter)
         else:
             # Other coaches (QM, SalesCoach, Trainer) – they are associated with a project via their project_id
             if coach.project_id:
-                query = TeamMember.query.join(Team).filter(Team.project_id == coach.project_id, Team.name != ARCHIV_TEAM_NAME)
+                query = TeamMember.query.join(Team, TeamMember.team_id == Team.id).filter(Team.project_id == coach.project_id, Team.name != ARCHIV_TEAM_NAME)
                 if project_filter and project_filter != coach.project_id:
                     # If PL's project doesn't match coach's project, return empty (they can't coach outside their project)
                     return jsonify([])
