@@ -127,6 +127,34 @@
         color: #e20074;
         border-color: #444 #444 #2b2b2b;
     }
+    .info-icon {
+        cursor: pointer;
+        margin-left: 5px;
+        color: #e20074;
+    }
+    .tooltip-custom {
+        position: relative;
+        display: inline-block;
+    }
+    .tooltip-custom .tooltip-text {
+        visibility: hidden;
+        background-color: #333;
+        color: #fff;
+        text-align: left;
+        border-radius: 6px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-size: 12px;
+        border: 1px solid #e20074;
+    }
+    .tooltip-custom:hover .tooltip-text {
+        visibility: visible;
+    }
 </style>
 {% endblock %}
 
@@ -143,22 +171,32 @@
 
         <!-- Performance Overview Section -->
         <div class="performance-card">
-            <h4>Performance-Übersicht der Teammitglieder</h4>
+            <h4>Performance-Übersicht der Teammitglieder
+                <span class="info-icon tooltip-custom">
+                    <i class="fas fa-info-circle"></i>
+                    <span class="tooltip-text">
+                        Berechnung des Gesamtscores:<br>
+                        • Performance-Note (40%)<br>
+                        • Anzahl Coachings (30%)<br>
+                        • Gesamtcoachingzeit (30%)<br>
+                        Alle Werte werden normalisiert (0-100).
+                    </span>
+                </span>
+            </h4>
             <p class="text-muted">Schneller Überblick über die aktuellen Durchschnittsleistungen. Klicken Sie auf "Zuweisen", um direkt eine Coaching-Aufgabe zu erstellen.</p>
 
             {% if member_performance %}
                 <!-- Sort controls for member table -->
                 <div class="row mb-3">
                     <div class="col-md-12 text-end">
-                        <button id="sortScoreDesc" class="btn btn-sm btn-outline-secondary">Nach Score absteigend</button>
-                        <button id="sortScoreAsc" class="btn btn-sm btn-outline-secondary">Nach Score aufsteigend</button>
-                        <button id="sortNameAsc" class="btn btn-sm btn-outline-secondary">Nach Name A-Z</button>
-                        <button id="sortCoachingsDesc" class="btn btn-sm btn-outline-secondary">Nach Coachings absteigend</button>
-                        <button id="sortTeamAsc" class="btn btn-sm btn-outline-secondary">Nach Team</button>
+                        <a href="#" class="btn btn-sm btn-outline-secondary" id="sortScore">Nach Score</a>
+                        <a href="#" class="btn btn-sm btn-outline-secondary" id="sortName">Nach Name</a>
+                        <a href="#" class="btn btn-sm btn-outline-secondary" id="sortTeam">Nach Team</a>
+                        <a href="#" class="btn btn-sm btn-outline-secondary" id="resetSort">Reset</a>
                     </div>
                 </div>
 
-                <!-- Accordion by team -->
+                <!-- Accordion by team (closed by default) -->
                 <div id="memberAccordion">
                     {% set teams = {} %}
                     {% for member in member_performance %}
@@ -171,27 +209,30 @@
 
                     {% for team_name, members in teams.items() %}
                         <div class="card team-accordion mb-2">
-                            <div class="card-header" id="heading{{ loop.index }}" data-toggle="collapse" data-target="#collapse{{ loop.index }}" aria-expanded="true">
+                            <div class="card-header" id="heading{{ loop.index }}" data-toggle="collapse" data-target="#collapse{{ loop.index }}" aria-expanded="false">
                                 <h5>
                                     <span><i class="fas fa-users"></i> {{ team_name }} <span class="badge">{{ members|length }} Mitglieder</span></span>
                                     <i class="fas fa-chevron-down collapse-icon"></i>
                                 </h5>
                             </div>
-                            <div id="collapse{{ loop.index }}" class="collapse show" aria-labelledby="heading{{ loop.index }}" data-parent="#memberAccordion">
+                            <div id="collapse{{ loop.index }}" class="collapse" aria-labelledby="heading{{ loop.index }}" data-parent="#memberAccordion">
                                 <div class="card-body p-0">
                                     <table class="table table-striped performance-table mb-0">
                                         <thead>
                                             <tr>
                                                 <th>Mitglied</th>
+                                                <th>Gesamtscore</th>
                                                 <th>Ø Performance (%)</th>
                                                 <th>Coachings</th>
+                                                <th>Gesamtzeit (Min.)</th>
                                                 <th>Letztes Coaching</th>
                                                 <th>Aktion</th>
                                              </thead>
                                         <tbody>
                                             {% for member in members %}
-                                            <tr data-score="{{ member.avg_score }}" data-name="{{ member.name }}" data-team="{{ member.team_name }}" data-coachings="{{ member.coaching_count }}">
+                                            <tr data-score="{{ member.combined_score }}" data-name="{{ member.name }}" data-team="{{ member.team_name }}" data-coachings="{{ member.coaching_count }}" data-performance="{{ member.avg_score }}" data-time="{{ member.total_time }}">
                                                 <td>{{ member.name }}</td>
+                                                <td><strong>{{ member.combined_score|round(1) }}%</strong></td>
                                                 <td>
                                                     <div class="progress" style="width: 100px;">
                                                         <div class="progress-bar" role="progressbar" style="width: {{ member.avg_score }}%;" aria-valuenow="{{ member.avg_score }}" aria-valuemin="0" aria-valuemax="100">
@@ -201,6 +242,7 @@
                                                     <span class="ms-2">{{ member.avg_score|round(1) }}%</span>
                                                 </td>
                                                 <td>{{ member.coaching_count }}</td>
+                                                <td>{{ member.total_time }}</td>
                                                 <td>{{ member.last_coaching_date|athens_time('%d.%m.%Y') if member.last_coaching_date else '-' }}</td>
                                                 <td>
                                                     <a href="{{ url_for('main.create_assigned_coaching', member_id=member.id) }}" class="btn btn-sm btn-sm-assign text-white">
@@ -217,12 +259,12 @@
                     {% endfor %}
                 </div>
 
-                <!-- Charts: Top 5 and Bottom 5 Performers -->
+                <!-- Charts: Top 5 and Bottom 5 Performers (based on combined score) -->
                 <div class="row mt-4">
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header telekom-bg-magenta text-white">
-                                Top 5 Performer
+                                Top 5 Performer (Gesamtscore)
                             </div>
                             <div class="card-body">
                                 <canvas id="topPerformersChart" style="height: 300px; width: 100%;"></canvas>
@@ -232,7 +274,7 @@
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header telekom-bg-magenta text-white">
-                                Niedrigste 5 Performer
+                                Niedrigste 5 Performer (Gesamtscore)
                             </div>
                             <div class="card-body">
                                 <canvas id="bottomPerformersChart" style="height: 300px; width: 100%;"></canvas>
@@ -275,6 +317,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Sorting for member performance table
+    let currentSort = null;
+    let currentDir = null;
+
     function sortRows(compareFn) {
         document.querySelectorAll('.team-accordion tbody').forEach(tbody => {
             let rows = Array.from(tbody.querySelectorAll('tr'));
@@ -283,44 +328,74 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    document.getElementById('sortScoreDesc').addEventListener('click', function() {
-        sortRows((a, b) => {
+    function setSort(compareFn, label) {
+        currentSort = label;
+        currentDir = (currentDir === 'asc' ? 'desc' : 'asc');
+        sortRows(compareFn);
+        // Update button styles
+        document.querySelectorAll('.btn-outline-secondary').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.getElementById(label + 'Sort');
+        if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    document.getElementById('sortScore').addEventListener('click', function(e) {
+        e.preventDefault();
+        setSort((a, b) => {
             let scoreA = parseFloat(a.getAttribute('data-score'));
             let scoreB = parseFloat(b.getAttribute('data-score'));
-            return scoreB - scoreA;
-        });
+            return currentDir === 'asc' ? scoreA - scoreB : scoreB - scoreA;
+        }, 'score');
     });
-    document.getElementById('sortScoreAsc').addEventListener('click', function() {
-        sortRows((a, b) => {
-            let scoreA = parseFloat(a.getAttribute('data-score'));
-            let scoreB = parseFloat(b.getAttribute('data-score'));
-            return scoreA - scoreB;
-        });
-    });
-    document.getElementById('sortNameAsc').addEventListener('click', function() {
-        sortRows((a, b) => {
+    document.getElementById('sortName').addEventListener('click', function(e) {
+        e.preventDefault();
+        setSort((a, b) => {
             let nameA = a.getAttribute('data-name');
             let nameB = b.getAttribute('data-name');
-            return nameA.localeCompare(nameB);
-        });
+            return currentDir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        }, 'name');
     });
-    document.getElementById('sortCoachingsDesc').addEventListener('click', function() {
-        sortRows((a, b) => {
-            let countA = parseInt(a.getAttribute('data-coachings'));
-            let countB = parseInt(b.getAttribute('data-coachings'));
-            return countB - countA;
-        });
-    });
-    document.getElementById('sortTeamAsc').addEventListener('click', function() {
+    document.getElementById('sortTeam').addEventListener('click', function(e) {
+        e.preventDefault();
         // Re-order the accordion cards by team name
         let accordion = document.getElementById('memberAccordion');
         let cards = Array.from(accordion.querySelectorAll('.card'));
         cards.sort((a, b) => {
             let teamA = a.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
             let teamB = b.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
+            return currentDir === 'asc' ? teamA.localeCompare(teamB) : teamB.localeCompare(teamA);
+        });
+        cards.forEach(card => accordion.appendChild(card));
+        currentSort = 'team';
+        currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+        document.querySelectorAll('.btn-outline-secondary').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('sortTeam').classList.add('active');
+    });
+    document.getElementById('resetSort').addEventListener('click', function(e) {
+        e.preventDefault();
+        currentSort = null;
+        currentDir = null;
+        // Reset to original order (by team, then name)
+        let accordion = document.getElementById('memberAccordion');
+        let cards = Array.from(accordion.querySelectorAll('.card'));
+        cards.sort((a, b) => {
+            let teamA = a.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
+            let teamB = b.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
+            if (teamA === teamB) {
+                let rowsA = a.querySelectorAll('tbody tr');
+                let rowsB = b.querySelectorAll('tbody tr');
+                // Not needed; just keep original order
+                return 0;
+            }
             return teamA.localeCompare(teamB);
         });
         cards.forEach(card => accordion.appendChild(card));
+        // Reset rows inside each team
+        document.querySelectorAll('.team-accordion tbody').forEach(tbody => {
+            let rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort((a, b) => a.getAttribute('data-name').localeCompare(b.getAttribute('data-name')));
+            rows.forEach(row => tbody.appendChild(row));
+        });
+        document.querySelectorAll('.btn-outline-secondary').forEach(btn => btn.classList.remove('active'));
     });
 
     // Make accordion headers toggle the collapse icon
@@ -335,23 +410,23 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Charts (top/bottom performers)
-    {% if view_type == 'pl' and member_performance %}
+    {% if view_type == 'pl' and top_performers %}
         var topNames = {{ top_performers|map(attribute='name')|list|tojson|safe }};
-        var topScores = {{ top_performers|map(attribute='avg_score')|list|tojson|safe }};
+        var topScores = {{ top_performers|map(attribute='combined_score')|list|tojson|safe }};
         var bottomNames = {{ bottom_performers|map(attribute='name')|list|tojson|safe }};
-        var bottomScores = {{ bottom_performers|map(attribute='avg_score')|list|tojson|safe }};
+        var bottomScores = {{ bottom_performers|map(attribute='combined_score')|list|tojson|safe }};
 
         if (topNames.length > 0) {
             new Chart(document.getElementById('topPerformersChart'), {
                 type: 'bar',
-                data: { labels: topNames, datasets: [{ label: 'Ø Performance (%)', data: topScores, backgroundColor: 'rgba(40, 167, 69, 0.7)', borderColor: 'rgba(40, 167, 69, 1)', borderWidth: 1 }] },
+                data: { labels: topNames, datasets: [{ label: 'Gesamtscore (%)', data: topScores, backgroundColor: 'rgba(40, 167, 69, 0.7)', borderColor: 'rgba(40, 167, 69, 1)', borderWidth: 1 }] },
                 options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true, max: 100, ticks: { color: '#f0f0f0' } }, x: { ticks: { color: '#f0f0f0' } } }, plugins: { legend: { labels: { color: '#f0f0f0' } } } }
             });
         }
         if (bottomNames.length > 0) {
             new Chart(document.getElementById('bottomPerformersChart'), {
                 type: 'bar',
-                data: { labels: bottomNames, datasets: [{ label: 'Ø Performance (%)', data: bottomScores, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderColor: 'rgba(220, 53, 69, 1)', borderWidth: 1 }] },
+                data: { labels: bottomNames, datasets: [{ label: 'Gesamtscore (%)', data: bottomScores, backgroundColor: 'rgba(220, 53, 69, 0.7)', borderColor: 'rgba(220, 53, 69, 1)', borderWidth: 1 }] },
                 options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true, max: 100, ticks: { color: '#f0f0f0' } }, x: { ticks: { color: '#f0f0f0' } } }, plugins: { legend: { labels: { color: '#f0f0f0' } } } }
             });
         }
