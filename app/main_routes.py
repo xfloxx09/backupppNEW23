@@ -406,7 +406,7 @@ def add_coaching():
         if form.team_member_id.data:
             form.update_assignment_choices(form.team_member_id.data, current_user.id)
         for field, errors in form.errors.items():
-            flash(f"Fehler '{form[field].label.text}': {'; '.join(errors)}', 'danger')
+            flash(f"Fehler '{form[field].label.text}': {'; '.join(errors)}", 'danger')
 
     tcap_js = "document.addEventListener('DOMContentLoaded',function(){var s=document.getElementById('coaching_style'),t=document.getElementById('tcap_id_field'),i=document.getElementById('tcap_id');function o(){if(s&&t&&i)if(s.value==='TCAP'){t.style.display='';i.required=!0}else{t.style.display='none';i.required=!1;i.value=''}}s&&t&&i&&(s.addEventListener('change',o),o())});"
     return render_template('main/add_coaching.html', title='Coaching hinzufügen', form=form, tcap_js=tcap_js, is_edit_mode=False, config=current_app.config)
