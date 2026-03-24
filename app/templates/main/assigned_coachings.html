@@ -81,9 +81,26 @@
     .team-accordion .card-header {
         background-color: #333;
         cursor: pointer;
+        transition: background-color 0.2s;
     }
     .team-accordion .card-header:hover {
         background-color: #3a3a3a;
+    }
+    .team-accordion .card-header h5 {
+        margin: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .team-accordion .card-header .badge {
+        background-color: #e20074;
+        color: white;
+    }
+    .team-accordion .card-header .collapse-icon {
+        transition: transform 0.2s;
+    }
+    .team-accordion .card-header.collapsed .collapse-icon {
+        transform: rotate(-90deg);
     }
     .team-accordion .card-body {
         padding: 0;
@@ -136,6 +153,7 @@
                         <button id="sortScoreDesc" class="btn btn-sm btn-outline-secondary">Nach Score absteigend</button>
                         <button id="sortScoreAsc" class="btn btn-sm btn-outline-secondary">Nach Score aufsteigend</button>
                         <button id="sortNameAsc" class="btn btn-sm btn-outline-secondary">Nach Name A-Z</button>
+                        <button id="sortCoachingsDesc" class="btn btn-sm btn-outline-secondary">Nach Coachings absteigend</button>
                         <button id="sortTeamAsc" class="btn btn-sm btn-outline-secondary">Nach Team</button>
                     </div>
                 </div>
@@ -154,9 +172,9 @@
                     {% for team_name, members in teams.items() %}
                         <div class="card team-accordion mb-2">
                             <div class="card-header" id="heading{{ loop.index }}" data-toggle="collapse" data-target="#collapse{{ loop.index }}" aria-expanded="true">
-                                <h5 class="mb-0">
-                                    <i class="fas fa-users"></i> {{ team_name }}
-                                    <span class="badge badge-secondary float-right">{{ members|length }} Mitglieder</span>
+                                <h5>
+                                    <span><i class="fas fa-users"></i> {{ team_name }} <span class="badge">{{ members|length }} Mitglieder</span></span>
+                                    <i class="fas fa-chevron-down collapse-icon"></i>
                                 </h5>
                             </div>
                             <div id="collapse{{ loop.index }}" class="collapse show" aria-labelledby="heading{{ loop.index }}" data-parent="#memberAccordion">
@@ -172,7 +190,7 @@
                                              </thead>
                                         <tbody>
                                             {% for member in members %}
-                                            <tr data-score="{{ member.avg_score }}" data-name="{{ member.name }}" data-team="{{ member.team_name }}">
+                                            <tr data-score="{{ member.avg_score }}" data-name="{{ member.name }}" data-team="{{ member.team_name }}" data-coachings="{{ member.coaching_count }}">
                                                 <td>{{ member.name }}</td>
                                                 <td>
                                                     <div class="progress" style="width: 100px;">
@@ -181,15 +199,15 @@
                                                         </div>
                                                     </div>
                                                     <span class="ms-2">{{ member.avg_score|round(1) }}%</span>
-                                                 </td>
+                                                </td>
                                                 <td>{{ member.coaching_count }}</td>
                                                 <td>{{ member.last_coaching_date|athens_time('%d.%m.%Y') if member.last_coaching_date else '-' }}</td>
                                                 <td>
                                                     <a href="{{ url_for('main.create_assigned_coaching', member_id=member.id) }}" class="btn btn-sm btn-sm-assign text-white">
                                                         <i class="bi bi-plus-circle"></i> Zuweisen
                                                     </a>
-                                                 </td>
-                                             </tr>
+                                                </td>
+                                            </tr>
                                             {% endfor %}
                                         </tbody>
                                     </table>
@@ -286,16 +304,34 @@ document.addEventListener('DOMContentLoaded', function() {
             return nameA.localeCompare(nameB);
         });
     });
+    document.getElementById('sortCoachingsDesc').addEventListener('click', function() {
+        sortRows((a, b) => {
+            let countA = parseInt(a.getAttribute('data-coachings'));
+            let countB = parseInt(b.getAttribute('data-coachings'));
+            return countB - countA;
+        });
+    });
     document.getElementById('sortTeamAsc').addEventListener('click', function() {
         // Re-order the accordion cards by team name
         let accordion = document.getElementById('memberAccordion');
         let cards = Array.from(accordion.querySelectorAll('.card'));
         cards.sort((a, b) => {
-            let teamA = a.querySelector('.card-header h5').innerText.trim();
-            let teamB = b.querySelector('.card-header h5').innerText.trim();
+            let teamA = a.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
+            let teamB = b.querySelector('.card-header h5 span').innerText.trim().split('\n')[0];
             return teamA.localeCompare(teamB);
         });
         cards.forEach(card => accordion.appendChild(card));
+    });
+
+    // Make accordion headers toggle the collapse icon
+    document.querySelectorAll('.team-accordion .card-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const icon = this.querySelector('.collapse-icon');
+            if (icon) {
+                icon.classList.toggle('fa-chevron-down');
+                icon.classList.toggle('fa-chevron-up');
+            }
+        });
     });
 
     // Charts (top/bottom performers)
