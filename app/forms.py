@@ -219,15 +219,32 @@ class AssignedCoachingForm(FlaskForm):
     desired_performance_note = IntegerField('Gewünschte Performance Note (0-10)', validators=[Optional(), NumberRange(min=0, max=10)], default=None)
     submit = SubmitField('Coaching zuweisen')
 
-    def __init__(self, project_id=None, *args, **kwargs):
+    def __init__(self, allowed_project_ids=None, *args, **kwargs):
         super(AssignedCoachingForm, self).__init__(*args, **kwargs)
-        if project_id:
+        if allowed_project_ids:
+            # Coaches: users with roles that can coach and belong to at least one allowed project
             coach_roles = ['Teamleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Admin', 'Betriebsleiter']
-            coaches = User.query.filter(User.role.in_(coach_roles)).order_by(User.username).all()
-            self.coach_id.choices = [(u.id, f"{u.username} ({u.role})") for u in coaches]
+            coaches = User.query.filter(User.role.in_(coach_roles)).all()
+            filtered_coaches = []
+            for coach in coaches:
+                if coach.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
+                    # Admins and Betriebsleiter can coach anyone – always include
+                    filtered_coaches.append(coach)
+                elif coach.role == ROLE_TEAMLEITER:
+                    # Teamleiter: include if they lead a team in one of the allowed projects
+                    led_teams = Team.query.join(team_leaders).filter(team_leaders.c.user_id == coach.id).all()
+                    if any(team.project_id in allowed_project_ids for team in led_teams):
+                        filtered_coaches.append(coach)
+                else:
+                    # Other coaches have a project_id – include if it's in allowed projects
+                    if coach.project_id in allowed_project_ids:
+                        filtered_coaches.append(coach)
+            filtered_coaches.sort(key=lambda u: u.username)
+            self.coach_id.choices = [(u.id, f"{u.username} ({u.role})") for u in filtered_coaches]
 
-            members = TeamMember.query.join(TeamMember.team).filter(
-                Team.project_id == project_id,
+            # Team members: from all allowed projects, excluding archiv
+            members = TeamMember.query.join(Team).filter(
+                Team.project_id.in_(allowed_project_ids),
                 Team.name != ARCHIV_TEAM_NAME
             ).order_by(TeamMember.name).all()
             self.team_member_id.choices = [(m.id, f"{m.name} ({m.team.name})") for m in members]
