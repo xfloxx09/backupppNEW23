@@ -32,27 +32,48 @@
             Durchgeführte Coachings
         </div>
         <div class="card-body">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Datum</th>
-                        <th>Coach</th>
-                        <th>Thema</th>
-                        <th>Note</th>
-                        <th>Score (%)</th>
-                    </thead>
-                <tbody>
-                    {% for coaching in report.coachings %}
-                    <tr>
-                        <td>{{ coaching.coaching_date|athens_time('%d.%m.%Y %H:%M') }}</td>
-                        <td>{{ coaching.coach.username }}</td>
-                        <td>{{ coaching.coaching_subject }}</td>
-                        <td>{{ coaching.performance_mark }}/10</td>
-                        <td>{{ coaching.overall_score }}%</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Coach</th>
+                            <th>Thema</th>
+                            <th>Note</th>
+                            <th>Score (%)</th>
+                            <th>Notizen des Coaches</th>
+                        </thead>
+                    <tbody>
+                        {% for coaching in report.coachings %}
+                        <tr>
+                            <td>{{ coaching.coaching_date|athens_time('%d.%m.%Y %H:%M') }}</td>
+                            <td>{{ coaching.coach.username }}</td>
+                            <td>{{ coaching.coaching_subject }}</td>
+                            <td>{{ coaching.performance_mark }}/10</td>
+                            <td>{{ coaching.overall_score }}%</td>
+                            <td>
+                                {% if coaching.coach_notes %}
+                                    {% set notes = coaching.coach_notes %}
+                                    {% if notes|length > 150 %}
+                                        {{ notes[:150] }}...
+                                        <button class="btn btn-sm btn-link p-0" type="button" data-toggle="collapse" data-target="#coachingNotes{{ coaching.id }}" aria-expanded="false">
+                                            mehr
+                                        </button>
+                                        <div class="collapse" id="coachingNotes{{ coaching.id }}">
+                                            {{ notes }}
+                                        </div>
+                                    {% else %}
+                                        {{ notes }}
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     {% else %}
