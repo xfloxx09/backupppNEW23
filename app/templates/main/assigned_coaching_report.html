@@ -31,7 +31,7 @@
                     <strong>Start-Ø-Note:</strong> {{ report.start_note|round(1) if report.start_note else 'N/A' }}%<br>
                     <strong>Ziel-Note:</strong> {{ report.target_note }}/10 ({{ report.target_note*10 if report.target_note else 'N/A' }}%)<br>
                     <strong>End-Ø-Note:</strong> {{ report.final_avg_score|round(1) }}%<br>
-                    <strong>Status:</strong> {{ report.status }}
+                    <strong>Status:</strong> {{ report.status|status_de }}
                 </div>
             </div>
         </div>
@@ -46,18 +46,17 @@
             <div class="table-responsive">
                 <table class="table table-striped">
                     <thead>
-                        <tr>
+                         …
                             <th>Datum</th>
                             <th>Coach</th>
                             <th>Thema</th>
                             <th>Note</th>
                             <th>Score (%)</th>
                             <th>Notizen des Coaches</th>
-                        </tr>
-                    </thead>
+                        </thead>
                     <tbody>
                         {% for coaching in report.coachings %}
-                        <tr>
+                         <tr>
                             <td>{{ coaching.coaching_date|athens_time('%d.%m.%Y %H:%M') }}</td>
                             <td>{{ coaching.coach.username }}</td>
                             <td>{{ coaching.coaching_subject }}</td>
