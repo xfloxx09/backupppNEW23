@@ -52,10 +52,8 @@ class RegistrationForm(FlaskForm):
             raise ValidationError('Dieser Benutzername ist bereits vergeben.')
 
     def validate_project_id(self, field):
-        # For roles other than Abteilungsleiter, we need project_id
         if self.role.data != 'Abteilungsleiter' and not field.data:
             raise ValidationError('Projekt ist erforderlich.')
-        # For Abteilungsleiter, project_id is optional, but we validate project_ids
         if self.role.data == 'Abteilungsleiter' and not self.project_ids.data:
             raise ValidationError('Mindestens ein Projekt muss ausgewählt werden.')
 
@@ -125,6 +123,7 @@ class CoachingForm(FlaskForm):
     performance_mark = IntegerField('Performance Note (0-10)', validators=[DataRequired("Performance Note ist erforderlich."), NumberRange(min=0, max=10)])
     time_spent = IntegerField('Zeitaufwand (Minuten)', validators=[DataRequired("Zeitaufwand ist erforderlich."), NumberRange(min=1)])
     coach_notes = TextAreaField('Notizen des Coaches', validators=[Length(max=2000)])
+    assigned_coaching_id = SelectField('Zugewiesene Aufgabe (optional)', coerce=int, choices=[], validators=[Optional()])
     submit = SubmitField('Coaching speichern')
 
     def __init__(self, current_user_role=None, current_user_team_ids=None, *args, **kwargs):
@@ -151,6 +150,16 @@ class CoachingForm(FlaskForm):
         for m in members:
             generated_choices.append((m.id, f"{m.name} ({m.team.name})"))
         self.team_member_id.choices = generated_choices
+
+    def update_assignment_choices(self, team_member_id, coach_id):
+        """Populate assigned_coaching_id choices with active assignments for this member and coach."""
+        from app.models import AssignedCoaching
+        assignments = AssignedCoaching.query.filter(
+            AssignedCoaching.team_member_id == team_member_id,
+            AssignedCoaching.coach_id == coach_id,
+            AssignedCoaching.status.in_(['pending', 'accepted', 'in_progress'])
+        ).all()
+        self.assigned_coaching_id.choices = [(0, '--- Keine zugewiesene Aufgabe ---')] + [(a.id, f"Aufgabe #{a.id} (bis {a.deadline.strftime('%d.%m.%y')}) – Fortschritt: {a.progress}%") for a in assignments]
 
 class PasswordChangeForm(FlaskForm):
     old_password = PasswordField('Aktuelles Passwort', validators=[DataRequired("Bitte aktuelles Passwort eingeben.")])
@@ -213,13 +222,10 @@ class AssignedCoachingForm(FlaskForm):
     def __init__(self, project_id=None, *args, **kwargs):
         super(AssignedCoachingForm, self).__init__(*args, **kwargs)
         if project_id:
-            # Coaches: users with roles that can coach
             coach_roles = ['Teamleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Admin', 'Betriebsleiter']
             coaches = User.query.filter(User.role.in_(coach_roles)).order_by(User.username).all()
             self.coach_id.choices = [(u.id, f"{u.username} ({u.role})") for u in coaches]
 
-            # Team members: from the given project, excluding archiv
-            # Use explicit relationship to avoid ambiguous foreign keys
             members = TeamMember.query.join(TeamMember.team).filter(
                 Team.project_id == project_id,
                 Team.name != ARCHIV_TEAM_NAME
