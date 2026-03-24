@@ -232,7 +232,8 @@ class AssignedCoachingForm(FlaskForm):
                     filtered_coaches.append(coach)
                 elif coach.role == ROLE_TEAMLEITER:
                     # Teamleiter: include if they lead a team in one of the allowed projects
-                    led_teams = Team.query.join(team_leaders).filter(team_leaders.c.user_id == coach.id).all()
+                    # Use the teams_led relationship
+                    led_teams = coach.teams_led.all()
                     if any(team.project_id in allowed_project_ids for team in led_teams):
                         filtered_coaches.append(coach)
                 else:
@@ -243,7 +244,7 @@ class AssignedCoachingForm(FlaskForm):
             self.coach_id.choices = [(u.id, f"{u.username} ({u.role})") for u in filtered_coaches]
 
             # Team members: from all allowed projects, excluding archiv
-            members = TeamMember.query.join(Team).filter(
+            members = TeamMember.query.join(Team, TeamMember.team_id == Team.id).filter(
                 Team.project_id.in_(allowed_project_ids),
                 Team.name != ARCHIV_TEAM_NAME
             ).order_by(TeamMember.name).all()
