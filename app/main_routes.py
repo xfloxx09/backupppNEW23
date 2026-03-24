@@ -109,6 +109,17 @@ def get_visible_project_id():
     else:
         return current_user.project_id
 
+def update_assignment_progress(assignment_id):
+    """Update assignment status based on completed coachings count."""
+    assignment = AssignedCoaching.query.get(assignment_id)
+    if assignment and assignment.status in ['accepted', 'in_progress', 'pending']:
+        completed = assignment.coachings.count()
+        if completed >= assignment.expected_coaching_count:
+            assignment.status = 'completed'
+        elif completed > 0:
+            assignment.status = 'in_progress'
+        db.session.commit()
+
 # --- ROUTEN ---
 
 @bp.route('/')
@@ -152,13 +163,11 @@ def coaching_dashboard():
                                        Coaching.coaching_subject.ilike(f"%{search_arg}%")
                                    ))
 
-    # IDs der gefilterten Coachings für saubere Summenberechnung
     filtered_ids_subquery = global_base.with_entities(Coaching.id).distinct().subquery()
     global_total_coachings = global_base.distinct().count()
     total_time = db.session.query(func.sum(Coaching.time_spent)).filter(Coaching.id.in_(filtered_ids_subquery)).scalar() or 0
     global_time_display = f"{total_time//60} Std. {total_time%60} Min. ({total_time} Min.)"
 
-    # --- Liste für Tabelle ---
     list_q = Coaching.query.join(TeamMember, Coaching.team_member_id == TeamMember.id)\
                            .join(Team, TeamMember.team_id == Team.id)\
                            .join(User, Coaching.coach_id == User.id, isouter=True)\
@@ -199,17 +208,14 @@ def coaching_dashboard():
     total_filtered_list = list_q.count()
     coachings_page = list_q.order_by(desc(Coaching.coaching_date)).paginate(page=page, per_page=10, error_out=False)
 
-    # --- Chart-Daten ---
     chart_perf = get_performance_data_for_charts(period_arg, team_arg, project_filter)
     chart_subj = get_coaching_subject_distribution(period_arg, team_arg, project_filter)
 
-    # --- Alle Teams für Filter ---
     all_teams_query = Team.query.filter(Team.name != ARCHIV_TEAM_NAME)
     if project_filter:
         all_teams_query = all_teams_query.filter(Team.project_id == project_filter)
     all_teams_dd = all_teams_query.order_by(Team.name).all()
 
-    # --- Alle verfügbaren Monate aus den Coachings (für Filter) ---
     query = db.session.query(
         func.date_trunc('month', Coaching.coaching_date).label('month'),
         func.count(Coaching.id).label('count')
@@ -352,6 +358,10 @@ def add_coaching():
 
     form.update_team_member_choices(exclude_archiv=True, project_id=selected_project_id)
 
+    # For assignment dropdown: pre-populate if member already selected (e.g., after form validation error)
+    if request.method == 'GET' and form.team_member_id.data:
+        form.update_assignment_choices(form.team_member_id.data, current_user.id)
+
     if form.validate_on_submit():
         try:
             member = TeamMember.query.get(form.team_member_id.data)
@@ -376,8 +386,15 @@ def add_coaching():
                 project_id=selected_project_id,
                 team_id=team_id
             )
+            if form.assigned_coaching_id.data and form.assigned_coaching_id.data != 0:
+                coaching.assigned_coaching_id = form.assigned_coaching_id.data
+
             db.session.add(coaching)
             db.session.commit()
+
+            if coaching.assigned_coaching_id:
+                update_assignment_progress(coaching.assigned_coaching_id)
+
             flash('Coaching erfolgreich gespeichert!', 'success')
             return redirect(url_for('main.coaching_dashboard'))
         except Exception as e:
@@ -385,8 +402,11 @@ def add_coaching():
             current_app.logger.error(f"Add coaching error: {e}")
             flash(f'Fehler: {str(e)}', 'danger')
     elif request.method == 'POST':
+        # On POST with validation errors, re-populate assignment choices based on submitted member
+        if form.team_member_id.data:
+            form.update_assignment_choices(form.team_member_id.data, current_user.id)
         for field, errors in form.errors.items():
-            flash(f"Fehler '{form[field].label.text}': {'; '.join(errors)}", 'danger')
+            flash(f"Fehler '{form[field].label.text}': {'; '.join(errors)}', 'danger')
 
     tcap_js = "document.addEventListener('DOMContentLoaded',function(){var s=document.getElementById('coaching_style'),t=document.getElementById('tcap_id_field'),i=document.getElementById('tcap_id');function o(){if(s&&t&&i)if(s.value==='TCAP'){t.style.display='';i.required=!0}else{t.style.display='none';i.required=!1;i.value=''}}s&&t&&i&&(s.addEventListener('change',o),o())});"
     return render_template('main/add_coaching.html', title='Coaching hinzufügen', form=form, tcap_js=tcap_js, is_edit_mode=False, config=current_app.config)
@@ -556,7 +576,6 @@ def workshop_dashboard():
 
     workshops_paginated = workshops_query.order_by(desc(Workshop.workshop_date)).paginate(page=page, per_page=10, error_out=False)
 
-    # --- Alle verfügbaren Monate aus den Workshops (für Filter) ---
     query = db.session.query(
         func.date_trunc('month', Workshop.workshop_date).label('month'),
         func.count(Workshop.id).label('count')
@@ -636,6 +655,8 @@ def edit_coaching(coaching_id):
             if coaching_to_edit.coaching_style != 'TCAP':
                 coaching_to_edit.tcap_id = None
             db.session.commit()
+            if coaching_to_edit.assigned_coaching_id:
+                update_assignment_progress(coaching_to_edit.assigned_coaching_id)
             flash('Coaching erfolgreich aktualisiert!', 'success')
             return redirect(request.args.get('next') or url_for('main.index'))
         except Exception as e:
@@ -645,6 +666,8 @@ def edit_coaching(coaching_id):
 
     if request.method == 'GET':
         form.team_member_id.data = coaching_to_edit.team_member_id
+        # Populate assignment choices
+        form.update_assignment_choices(coaching_to_edit.team_member_id, coaching_to_edit.coach_id)
 
     tcap_js = """document.addEventListener('DOMContentLoaded',function(){var s=document.getElementById('coaching_style'),t=document.getElementById('tcap_id_field'),i=document.getElementById('tcap_id');function o(){if(s&&t&&i)if(s.value==='TCAP'){t.style.display='';i.required=!0}else{t.style.display='none';i.required=!1}}s&&t&&i&&(s.addEventListener('change'),o())});"""
     return render_template('main/add_coaching.html',
@@ -834,26 +857,20 @@ def assigned_coachings():
     page = request.args.get('page', 1, type=int)
     project_filter = get_visible_project_id()
 
-    # Determine view type based on role
-    # PL view: Admin, Betriebsleiter, Projektleiter
     if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_PROJEKTLEITER]:
         view_type = 'pl'
         if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
             query = AssignedCoaching.query
         else:
             query = AssignedCoaching.query.filter_by(project_leader_id=current_user.id)
-        # Apply project filter for PL view
         if project_filter:
             query = query.join(AssignedCoaching.team_member).join(TeamMember.team).filter(Team.project_id == project_filter)
     else:
-        # Coach view: any other role that can coach (Teamleiter, QM, SalesCoach, Trainer, etc.)
         view_type = 'coach'
         query = AssignedCoaching.query.filter_by(coach_id=current_user.id)
-        # No project filter for coaches – they see all assigned coachings regardless of project
 
     assignments = query.order_by(AssignedCoaching.deadline.asc(), AssignedCoaching.created_at.desc()).paginate(page=page, per_page=10, error_out=False)
 
-    # Prepare projects for filter dropdown (only for PL view)
     all_projects = []
     if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
         all_projects = Project.query.order_by(Project.name).all()
@@ -942,21 +959,16 @@ def reject_assigned_coaching(assignment_id):
     return redirect(url_for('main.assigned_coachings'))
 
 
-# NEW: Cancel route for PL to cancel an assigned coaching
 @bp.route('/assigned-coachings/<int:assignment_id>/cancel', methods=['POST'])
 @login_required
 def cancel_assigned_coaching(assignment_id):
     assignment = AssignedCoaching.query.get_or_404(assignment_id)
-    # Only the project leader (creator) can cancel
     if assignment.project_leader_id != current_user.id and current_user.role not in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
-        flash('Nur der Projektleiter kann diese Coaching-Aufgabe stornieren.', 'danger')
+        flash('Sie haben keine Berechtigung, diese Aufgabe zu stornieren.', 'danger')
         return redirect(url_for('main.assigned_coachings'))
-
-    # Can only cancel if not already completed or expired
-    if assignment.status in ['completed', 'expired']:
-        flash('Diese Aufgabe kann nicht mehr storniert werden, da sie bereits abgeschlossen oder abgelaufen ist.', 'warning')
+    if assignment.status in ['completed', 'expired', 'cancelled']:
+        flash('Diese Aufgabe kann nicht mehr storniert werden.', 'warning')
         return redirect(url_for('main.assigned_coachings'))
-
     assignment.status = 'cancelled'
     db.session.commit()
     flash('Coaching-Aufgabe wurde storniert.', 'success')
@@ -988,6 +1000,21 @@ def assigned_coaching_report(assignment_id):
     }
 
     return render_template('main/assigned_coaching_report.html', report=report, config=current_app.config)
+
+
+@bp.route('/api/available_assignments', methods=['GET'])
+@login_required
+def available_assignments():
+    member_id = request.args.get('member_id', type=int)
+    if not member_id:
+        return jsonify({'assignments': []})
+    assignments = AssignedCoaching.query.filter(
+        AssignedCoaching.team_member_id == member_id,
+        AssignedCoaching.coach_id == current_user.id,
+        AssignedCoaching.status.in_(['pending', 'accepted', 'in_progress'])
+    ).all()
+    assignment_list = [{'id': a.id, 'deadline': a.deadline.strftime('%d.%m.%y'), 'progress': a.progress} for a in assignments]
+    return jsonify({'assignments': assignment_list})
 
 
 @bp.route('/api/member_current_score', methods=['GET'])
