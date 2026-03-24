@@ -25,17 +25,6 @@
                     {% if current_user.role in ['Projektleiter', 'Qualitätsmanager', 'Abteilungsleiter', 'Admin', 'Betriebsleiter'] %} 
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('main.pl_qm_dashboard') }}">Teams</a></li> 
                     {% endif %}
-                    <!-- Zugewiesene Coachings -->
-                    {% if current_user.is_authenticated and current_user.role in ['Projektleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Teamleiter', 'Admin', 'Betriebsleiter', 'Abteilungsleiter'] %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.assigned_coachings') }}">
-                                <i class="fas fa-tasks"></i> Zugewiesene Coachings
-                                {% if pending_assigned_count > 0 %}
-                                    <span class="badge badge-danger">{{ pending_assigned_count }}</span>
-                                {% endif %}
-                            </a>
-                        </li>
-                    {% endif %}
                     {% if current_user.role in ['Admin', 'Betriebsleiter'] %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
