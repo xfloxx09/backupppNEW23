@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
 {% block head_extra %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
     .assignment-card {
         background-color: #2b2b2b;
@@ -46,6 +48,42 @@
     .btn-group {
         margin-top: 10px;
     }
+    .performance-card {
+        background-color: #2b2b2b;
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    .performance-table {
+        background-color: #2b2b2b;
+        border-radius: 8px;
+    }
+    .performance-table th, .performance-table td {
+        border-color: #444;
+    }
+    .performance-table a {
+        color: #e20074;
+    }
+    .performance-table a:hover {
+        color: #ff66a0;
+    }
+    .badge-high {
+        background-color: #28a745;
+    }
+    .badge-low {
+        background-color: #dc3545;
+    }
+    .btn-sm-assign {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        background-color: #e20074;
+        border-color: #e20074;
+    }
+    .btn-sm-assign:hover {
+        background-color: #c0005e;
+        border-color: #c0005e;
+    }
 </style>
 {% endblock %}
 
@@ -55,10 +93,87 @@
     {% if view_type == 'pl' %}
         <p>Hier sehen Sie die von Ihnen erstellten Coaching-Aufgaben.</p>
         <a href="{{ url_for('main.create_assigned_coaching') }}" class="btn telekom-button mb-3">Neue Coaching-Aufgabe</a>
+
+        <!-- Performance Overview Section -->
+        <div class="performance-card">
+            <h4>Performance-Übersicht der Teammitglieder</h4>
+            <p class="text-muted">Schneller Überblick über die aktuellen Durchschnittsleistungen. Klicken Sie auf "Zuweisen", um direkt eine Coaching-Aufgabe zu erstellen.</p>
+
+            {% if member_performance %}
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="table-responsive">
+                            <table class="table table-striped performance-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mitglied</th>
+                                        <th>Team</th>
+                                        <th>Ø Performance (%)</th>
+                                        <th>Coachings</th>
+                                        <th>Letztes Coaching</th>
+                                        <th>Aktion</th>
+                                     </thead>
+                                <tbody>
+                                    {% for member in member_performance %}
+                                     <tr>
+                                        <td>{{ member.name }}</td>
+                                        <td>{{ member.team_name }}</td>
+                                        <td>
+                                            <div class="progress" style="width: 100px;">
+                                                <div class="progress-bar" role="progressbar" style="width: {{ member.avg_score }}%;" aria-valuenow="{{ member.avg_score }}" aria-valuemin="0" aria-valuemax="100">
+                                                    {{ member.avg_score|round(0) }}%
+                                                </div>
+                                            </div>
+                                            <span class="ms-2">{{ member.avg_score|round(1) }}%</span>
+                                        </td>
+                                        <td>{{ member.coaching_count }}</td>
+                                        <td>{{ member.last_coaching_date|athens_time('%d.%m.%Y') if member.last_coaching_date else '-' }}</td>
+                                        <td>
+                                            <a href="{{ url_for('main.create_assigned_coaching', member_id=member.id) }}" class="btn btn-sm btn-sm-assign text-white">
+                                                <i class="bi bi-plus-circle"></i> Zuweisen
+                                            </a>
+                                        </td>
+                                     </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts: Top 5 and Bottom 5 Performers -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header telekom-bg-magenta text-white">
+                                Top 5 Performer
+                            </div>
+                            <div class="card-body">
+                                <canvas id="topPerformersChart" style="height: 300px; width: 100%;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header telekom-bg-magenta text-white">
+                                Niedrigste 5 Performer
+                            </div>
+                            <div class="card-body">
+                                <canvas id="bottomPerformersChart" style="height: 300px; width: 100%;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-muted">Keine Teammitglieder in den aktuell sichtbaren Projekten gefunden.</p>
+            {% endif %}
+        </div>
+        <hr class="my-4">
     {% else %}
         <p>Hier sehen Sie die Ihnen zugewiesenen Coaching-Aufgaben. Sie können diese annehmen oder ablehnen.</p>
     {% endif %}
 
+    <!-- Existing assignments list -->
     <div class="row">
         <div class="col-md-12">
             {% for assignment in assignments.items %}
@@ -133,4 +248,86 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if view_type == 'pl' and member_performance %}
+        // Top performers data
+        var topNames = {{ top_performers|map(attribute='name')|list|tojson|safe }};
+        var topScores = {{ top_performers|map(attribute='avg_score')|list|tojson|safe }};
+        // Bottom performers data
+        var bottomNames = {{ bottom_performers|map(attribute='name')|list|tojson|safe }};
+        var bottomScores = {{ bottom_performers|map(attribute='avg_score')|list|tojson|safe }};
+
+        // Top performers chart
+        var ctxTop = document.getElementById('topPerformersChart').getContext('2d');
+        new Chart(ctxTop, {
+            type: 'bar',
+            data: {
+                labels: topNames,
+                datasets: [{
+                    label: 'Ø Performance (%)',
+                    data: topScores,
+                    backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { color: '#f0f0f0' }
+                    },
+                    x: {
+                        ticks: { color: '#f0f0f0' }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#f0f0f0' } }
+                }
+            }
+        });
+
+        // Bottom performers chart
+        var ctxBottom = document.getElementById('bottomPerformersChart').getContext('2d');
+        new Chart(ctxBottom, {
+            type: 'bar',
+            data: {
+                labels: bottomNames,
+                datasets: [{
+                    label: 'Ø Performance (%)',
+                    data: bottomScores,
+                    backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { color: '#f0f0f0' }
+                    },
+                    x: {
+                        ticks: { color: '#f0f0f0' }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#f0f0f0' } }
+                }
+            }
+        });
+    {% endif %}
+});
+</script>
 {% endblock %}
