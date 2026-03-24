@@ -4,6 +4,30 @@
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
 $(document).ready(function() {
+    // When coach changes, load members
+    $('#coach_id').change(function() {
+        var coachId = $(this).val();
+        var teamMemberSelect = $('#team_member_id');
+        if (coachId) {
+            teamMemberSelect.html('<option value="">Lade Mitglieder...</option>');
+            $.getJSON("{{ url_for('main.api_coach_team_members', coach_id=0) }}".replace('0', coachId) + "?project={{ current_project_filter or '' }}", function(data) {
+                var options = '<option value="">-- Bitte wählen --</option>';
+                $.each(data, function(i, member) {
+                    options += '<option value="' + member.id + '">' + member.name + ' (' + member.team_name + ')</option>';
+                });
+                teamMemberSelect.html(options);
+            }).fail(function() {
+                teamMemberSelect.html('<option value="">Fehler beim Laden der Mitglieder</option>');
+            });
+        } else {
+            teamMemberSelect.html('<option value="">-- Bitte zuerst Coach wählen --</option>');
+        }
+        // Also reset current note display
+        $('#current_note_display').text('N/A');
+        $('#current_note_hidden').val('');
+    });
+
+    // When team member changes, load current performance note
     $('#team_member_id').change(function() {
         var memberId = $(this).val();
         if (memberId) {
@@ -41,9 +65,11 @@ $(document).ready(function() {
 
                     <div class="form-group">
                         {{ form.team_member_id.label(class="form-control-label") }}
-                        {{ form.team_member_id(class="form-control custom-select " + ("is-invalid" if form.team_member_id.errors else "")) }}
+                        <select name="team_member_id" id="team_member_id" class="form-control custom-select" required>
+                            <option value="">-- Bitte zuerst Coach wählen --</option>
+                        </select>
                         {% if form.team_member_id.errors %}
-                            <div class="invalid-feedback">{% for error in form.team_member_id.errors %}{{ error }}{% endfor %}</div>
+                            <div class="invalid-feedback d-block">{% for error in form.team_member_id.errors %}{{ error }}{% endfor %}</div>
                         {% endif %}
                         <small class="form-text text-muted">Aktuelle Performance Note: <span id="current_note_display">N/A</span></small>
                         <input type="hidden" id="current_note_hidden" name="current_note">
