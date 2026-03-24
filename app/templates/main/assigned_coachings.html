@@ -68,12 +68,6 @@
     .performance-table a:hover {
         color: #ff66a0;
     }
-    .badge-high {
-        background-color: #28a745;
-    }
-    .badge-low {
-        background-color: #dc3545;
-    }
     .btn-sm-assign {
         padding: 0.2rem 0.5rem;
         font-size: 0.75rem;
@@ -83,6 +77,89 @@
     .btn-sm-assign:hover {
         background-color: #c0005e;
         border-color: #c0005e;
+    }
+    .team-group {
+        margin-bottom: 20px;
+        border: 1px solid #444;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .team-header {
+        background-color: #333;
+        padding: 10px 15px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #444;
+    }
+    .team-header:hover {
+        background-color: #3a3a3a;
+    }
+    .team-header h5 {
+        margin: 0;
+        color: #fff;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .team-header h5 i {
+        color: #e20074;
+    }
+    .team-header .badge {
+        background-color: #e20074;
+        margin-left: 10px;
+    }
+    .team-members-table {
+        width: 100%;
+        background-color: #2b2b2b;
+    }
+    .team-members-table th, .team-members-table td {
+        padding: 8px 12px;
+        border-bottom: 1px solid #444;
+    }
+    .team-members-table tr:last-child td {
+        border-bottom: none;
+    }
+    .team-members-table th {
+        background-color: #3a3a3a;
+        font-weight: 600;
+    }
+    .collapsed .team-members-table {
+        display: none;
+    }
+    .sort-icon {
+        margin-left: 5px;
+        font-size: 0.8rem;
+        opacity: 0.6;
+    }
+    .sort-icon.active {
+        opacity: 1;
+        color: #e20074;
+    }
+    .sortable {
+        cursor: pointer;
+        user-select: none;
+    }
+    .sortable:hover {
+        background-color: #444;
+    }
+    .filter-controls {
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .filter-controls button {
+        background-color: #3a3a3a;
+        border: 1px solid #555;
+        color: #f0f0f0;
+    }
+    .filter-controls button:hover {
+        background-color: #e20074;
+        border-color: #e20074;
     }
 </style>
 {% endblock %}
@@ -100,49 +177,70 @@
             <p class="text-muted">Schneller Überblick über die aktuellen Durchschnittsleistungen. Klicken Sie auf "Zuweisen", um direkt eine Coaching-Aufgabe zu erstellen.</p>
 
             {% if member_performance %}
-                <div class="row mb-4">
-                    <div class="col-md-12">
-                        <div class="table-responsive">
-                            <table class="table table-striped performance-table">
+                <!-- Filter and Sort Controls -->
+                <div class="filter-controls">
+                    <div class="btn-group" role="group">
+                        <button id="sort-by-name" class="btn btn-sm sort-btn">Name <span class="sort-icon" data-sort="name">↕️</span></button>
+                        <button id="sort-by-team" class="btn btn-sm sort-btn">Team <span class="sort-icon" data-sort="team">↕️</span></button>
+                        <button id="sort-by-score" class="btn btn-sm sort-btn">Ø Performance <span class="sort-icon" data-sort="score">↕️</span></button>
+                        <button id="sort-by-count" class="btn btn-sm sort-btn">Coachings <span class="sort-icon" data-sort="count">↕️</span></button>
+                        <button id="sort-by-last" class="btn btn-sm sort-btn">Letztes Coaching <span class="sort-icon" data-sort="last">↕️</span></button>
+                    </div>
+                    <div class="btn-group" role="group">
+                        <button id="expand-all" class="btn btn-sm">Alle Teams öffnen</button>
+                        <button id="collapse-all" class="btn btn-sm">Alle Teams schließen</button>
+                    </div>
+                </div>
+
+                <div id="members-container">
+                    {% for team_name, members in member_performance|groupby('team_name') %}
+                    <div class="team-group collapsed">
+                        <div class="team-header" data-team="{{ team_name }}">
+                            <h5><i class="fas fa-users"></i> {{ team_name }} <span class="badge">{{ members|length }}</span></h5>
+                            <span><i class="fas fa-chevron-down"></i></span>
+                        </div>
+                        <div class="team-members-table">
+                            <table class="table performance-table">
                                 <thead>
                                     <tr>
-                                        <th>Mitglied</th>
-                                        <th>Team</th>
-                                        <th>Ø Performance (%)</th>
-                                        <th>Coachings</th>
-                                        <th>Letztes Coaching</th>
+                                        <th data-sort="name">Name</th>
+                                        <th data-sort="team">Team</th>
+                                        <th data-sort="score">Ø Performance (%)</th>
+                                        <th data-sort="count">Coachings</th>
+                                        <th data-sort="last">Letztes Coaching</th>
                                         <th>Aktion</th>
-                                     </thead>
+                                    </thead>
                                 <tbody>
-                                    {% for member in member_performance %}
-                                     <tr>
-                                        <td>{{ member.name }}</td>
-                                        <td>{{ member.team_name }}</td>
-                                        <td>
+                                    {% for member in members %}
+                                     <tr data-member-id="{{ member.id }}" data-name="{{ member.name }}" data-team="{{ member.team_name }}" data-score="{{ member.avg_score }}" data-count="{{ member.coaching_count }}" data-last="{{ member.last_coaching_date.isoformat() if member.last_coaching_date else '' }}">
+                                         <td>{{ member.name }}</td>
+                                         <td>{{ member.team_name }}</td>
+                                         <td>
                                             <div class="progress" style="width: 100px;">
                                                 <div class="progress-bar" role="progressbar" style="width: {{ member.avg_score }}%;" aria-valuenow="{{ member.avg_score }}" aria-valuemin="0" aria-valuemax="100">
                                                     {{ member.avg_score|round(0) }}%
                                                 </div>
                                             </div>
                                             <span class="ms-2">{{ member.avg_score|round(1) }}%</span>
-                                        </td>
-                                        <td>{{ member.coaching_count }}</td>
-                                        <td>{{ member.last_coaching_date|athens_time('%d.%m.%Y') if member.last_coaching_date else '-' }}</td>
-                                        <td>
+                                         </td>
+                                         <td>{{ member.coaching_count }}</td>
+                                         <td>{{ member.last_coaching_date|athens_time('%d.%m.%Y') if member.last_coaching_date else '-' }}</td>
+                                         <td>
                                             <a href="{{ url_for('main.create_assigned_coaching', member_id=member.id) }}" class="btn btn-sm btn-sm-assign text-white">
                                                 <i class="bi bi-plus-circle"></i> Zuweisen
                                             </a>
-                                        </td>
+                                         </td>
                                      </tr>
                                     {% endfor %}
                                 </tbody>
-                            </table>
+                             </table>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
 
                 <!-- Charts: Top 5 and Bottom 5 Performers -->
-                <div class="row">
+                <div class="row mt-4">
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header telekom-bg-magenta text-white">
@@ -328,6 +426,142 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     {% endif %}
+
+    // --- Collapsible teams and sorting ---
+    const teamGroups = document.querySelectorAll('.team-group');
+    const expandAllBtn = document.getElementById('expand-all');
+    const collapseAllBtn = document.getElementById('collapse-all');
+    const sortBtns = document.querySelectorAll('.sort-btn');
+    let currentSort = { field: null, order: 'asc' };
+
+    // Toggle team visibility
+    function toggleTeam(header) {
+        const group = header.closest('.team-group');
+        group.classList.toggle('collapsed');
+        const icon = header.querySelector('.fas');
+        if (icon) {
+            icon.classList.toggle('fa-chevron-down');
+            icon.classList.toggle('fa-chevron-up');
+        }
+    }
+
+    // Expand/collapse all
+    function expandAll() {
+        teamGroups.forEach(group => {
+            group.classList.remove('collapsed');
+            const icon = group.querySelector('.team-header .fas');
+            if (icon) {
+                icon.classList.add('fa-chevron-up');
+                icon.classList.remove('fa-chevron-down');
+            }
+        });
+    }
+
+    function collapseAll() {
+        teamGroups.forEach(group => {
+            group.classList.add('collapsed');
+            const icon = group.querySelector('.team-header .fas');
+            if (icon) {
+                icon.classList.add('fa-chevron-down');
+                icon.classList.remove('fa-chevron-up');
+            }
+        });
+    }
+
+    // Attach click handlers to team headers
+    document.querySelectorAll('.team-header').forEach(header => {
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleTeam(header);
+        });
+    });
+
+    if (expandAllBtn) expandAllBtn.addEventListener('click', expandAll);
+    if (collapseAllBtn) collapseAllBtn.addEventListener('click', collapseAll);
+
+    // Sorting logic
+    function sortMembers(field, order) {
+        const container = document.getElementById('members-container');
+        const groups = Array.from(container.querySelectorAll('.team-group'));
+        
+        // For each team group, sort its rows
+        groups.forEach(group => {
+            const tbody = group.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort((a, b) => {
+                let aVal, bVal;
+                switch(field) {
+                    case 'name':
+                        aVal = a.getAttribute('data-name');
+                        bVal = b.getAttribute('data-name');
+                        break;
+                    case 'team':
+                        aVal = a.getAttribute('data-team');
+                        bVal = b.getAttribute('data-team');
+                        break;
+                    case 'score':
+                        aVal = parseFloat(a.getAttribute('data-score'));
+                        bVal = parseFloat(b.getAttribute('data-score'));
+                        break;
+                    case 'count':
+                        aVal = parseInt(a.getAttribute('data-count'));
+                        bVal = parseInt(b.getAttribute('data-count'));
+                        break;
+                    case 'last':
+                        aVal = a.getAttribute('data-last');
+                        bVal = b.getAttribute('data-last');
+                        break;
+                    default:
+                        return 0;
+                }
+                if (aVal === bVal) return 0;
+                if (order === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        });
+        
+        // After sorting, update sort icons
+        document.querySelectorAll('.sort-icon').forEach(icon => {
+            icon.classList.remove('active');
+            icon.textContent = '↕️';
+        });
+        const activeIcon = document.querySelector(`.sort-icon[data-sort="${field}"]`);
+        if (activeIcon) {
+            activeIcon.classList.add('active');
+            activeIcon.textContent = order === 'asc' ? '↑' : '↓';
+        }
+    }
+
+    // Attach sort button events
+    sortBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const field = btn.id.replace('sort-by-', '');
+            const iconSpan = btn.querySelector('.sort-icon');
+            let order = 'asc';
+            if (currentSort.field === field && currentSort.order === 'asc') {
+                order = 'desc';
+            }
+            currentSort = { field, order };
+            sortMembers(field, order);
+        });
+    });
+
+    // Optional: set initial sort by score descending (high performers first)
+    sortMembers('score', 'desc');
+    currentSort = { field: 'score', order: 'desc' };
+    const scoreBtn = document.getElementById('sort-by-score');
+    if (scoreBtn) {
+        const icon = scoreBtn.querySelector('.sort-icon');
+        if (icon) {
+            icon.classList.add('active');
+            icon.textContent = '↓';
+        }
+    }
 });
 </script>
 {% endblock %}
