@@ -74,24 +74,24 @@
                          </thead>
                     <tbody>
                         {% for assignment in assignments.items %}
-                         <tr>
-                             <td>{{ assignment.deadline|athens_time('%d.%m.%Y %H:%M') }}</td>
-                             <td>{{ assignment.team_member.name }} ({{ assignment.team_member.team.name }})</td>
-                             <td>{{ assignment.coach.username }}</td>
-                             <td>{{ assignment.expected_coaching_count }}</td>
-                             <td>
+                          <tr>
+                              <td>{{ assignment.deadline|athens_time('%d.%m.%Y %H:%M') }}</td>
+                              <td>{{ assignment.team_member.name }} ({{ assignment.team_member.team.name }})</td>
+                              <td>{{ assignment.coach.username }}</td>
+                              <td>{{ assignment.expected_coaching_count }}</td>
+                              <td>
                                 <div class="progress" style="height: 10px; width: 100px;">
                                     <div class="progress-bar" role="progressbar" style="width: {{ assignment.progress }}%;" aria-valuenow="{{ assignment.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
                                 </div>
                                 {{ assignment.progress }}%
-                             </td>
-                             <td>
+                              </td>
+                              <td>
                                 <span class="assignment-status status-{{ assignment.status }}">{{ assignment.status|replace('_',' ') }}</span>
                                 {% if assignment.is_overdue and assignment.status not in ['completed','expired','cancelled'] %}
                                     <span class="deadline-overdue">Überfällig!</span>
                                 {% endif %}
-                             </td>
-                             <td>
+                              </td>
+                              <td>
                                 {% if view_type == 'coach' and assignment.status == 'pending' %}
                                     <form action="{{ url_for('main.accept_assigned_coaching', assignment_id=assignment.id) }}" method="POST" style="display: inline;">
                                         <button type="submit" class="btn btn-sm btn-success">Annehmen</button>
@@ -108,11 +108,11 @@
                                 {% if view_type == 'pl' and assignment.status == 'completed' %}
                                     <a href="{{ url_for('main.assigned_coaching_report', assignment_id=assignment.id) }}" class="btn btn-sm btn-info">Bericht</a>
                                 {% endif %}
-                             </td>
-                         </tr>
+                              </td>
+                          </tr>
                         {% endfor %}
                     </tbody>
-                 </table>
+                </table>
             </div>
 
             <!-- Pagination -->
