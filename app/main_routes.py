@@ -942,6 +942,27 @@ def reject_assigned_coaching(assignment_id):
     return redirect(url_for('main.assigned_coachings'))
 
 
+# NEW: Cancel route for PL to cancel an assigned coaching
+@bp.route('/assigned-coachings/<int:assignment_id>/cancel', methods=['POST'])
+@login_required
+def cancel_assigned_coaching(assignment_id):
+    assignment = AssignedCoaching.query.get_or_404(assignment_id)
+    # Only the project leader (creator) can cancel
+    if assignment.project_leader_id != current_user.id and current_user.role not in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
+        flash('Nur der Projektleiter kann diese Coaching-Aufgabe stornieren.', 'danger')
+        return redirect(url_for('main.assigned_coachings'))
+
+    # Can only cancel if not already completed or expired
+    if assignment.status in ['completed', 'expired']:
+        flash('Diese Aufgabe kann nicht mehr storniert werden, da sie bereits abgeschlossen oder abgelaufen ist.', 'warning')
+        return redirect(url_for('main.assigned_coachings'))
+
+    assignment.status = 'cancelled'
+    db.session.commit()
+    flash('Coaching-Aufgabe wurde storniert.', 'success')
+    return redirect(url_for('main.assigned_coachings'))
+
+
 @bp.route('/assigned-coachings/<int:assignment_id>/report')
 @login_required
 def assigned_coaching_report(assignment_id):
