@@ -4,13 +4,12 @@
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
 $(document).ready(function() {
-    // When coach changes, load members
+    // When coach changes, load members grouped by team
     $('#coach_id').change(function() {
         var coachId = $(this).val();
         var teamMemberSelect = $('#team_member_id');
         if (coachId) {
             teamMemberSelect.html('<option value="">Lade Mitglieder...</option>');
-            // Build URL with optional project filter
             var url = "{{ url_for('main.api_coach_team_members', coach_id=0) }}".replace('0', coachId);
             var projectFilter = "{{ current_project_filter or '' }}";
             if (projectFilter) {
@@ -18,9 +17,21 @@ $(document).ready(function() {
             }
             $.getJSON(url)
                 .done(function(data) {
-                    var options = '<option value="">-- Bitte wählen --</option>';
+                    // Group members by team
+                    var grouped = {};
                     $.each(data, function(i, member) {
-                        options += '<option value="' + member.id + '">' + member.name + ' (' + member.team_name + ')</option>';
+                        if (!grouped[member.team_name]) {
+                            grouped[member.team_name] = [];
+                        }
+                        grouped[member.team_name].push(member);
+                    });
+                    var options = '<option value="">-- Bitte wählen --</option>';
+                    $.each(grouped, function(teamName, members) {
+                        options += '<optgroup label="' + teamName + '">';
+                        $.each(members, function(j, member) {
+                            options += '<option value="' + member.id + '">' + member.name + '</option>';
+                        });
+                        options += '</optgroup>';
                     });
                     teamMemberSelect.html(options);
                 })
