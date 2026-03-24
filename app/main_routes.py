@@ -358,9 +358,11 @@ def add_coaching():
 
     form.update_team_member_choices(exclude_archiv=True, project_id=selected_project_id)
 
-    # For assignment dropdown: pre-populate if member already selected (e.g., after form validation error)
-    if request.method == 'GET' and form.team_member_id.data:
-        form.update_assignment_choices(form.team_member_id.data, current_user.id)
+    # --- Pre-populate assignment choices on POST before validation ---
+    if request.method == 'POST':
+        team_member_id = request.form.get('team_member_id', type=int)
+        if team_member_id:
+            form.update_assignment_choices(team_member_id, current_user.id)
 
     if form.validate_on_submit():
         try:
@@ -402,7 +404,7 @@ def add_coaching():
             current_app.logger.error(f"Add coaching error: {e}")
             flash(f'Fehler: {str(e)}', 'danger')
     elif request.method == 'POST':
-        # On POST with validation errors, re-populate assignment choices based on submitted member
+        # On POST with validation errors, re-populate assignment choices for re-rendering
         if form.team_member_id.data:
             form.update_assignment_choices(form.team_member_id.data, current_user.id)
         for field, errors in form.errors.items():
@@ -649,6 +651,12 @@ def edit_coaching(coaching_id):
     form = CoachingForm(obj=coaching_to_edit, current_user_role=current_user.role, current_user_team_ids=user_team_ids)
     form.update_team_member_choices(exclude_archiv=False, project_id=coaching_to_edit.project_id)
 
+    # --- Pre-populate assignment choices on POST before validation ---
+    if request.method == 'POST':
+        team_member_id = request.form.get('team_member_id', type=int)
+        if team_member_id:
+            form.update_assignment_choices(team_member_id, current_user.id)
+
     if form.validate_on_submit():
         try:
             form.populate_obj(coaching_to_edit)
@@ -663,11 +671,13 @@ def edit_coaching(coaching_id):
             db.session.rollback()
             current_app.logger.error(f"Update coaching ID {coaching_id} error: {e}")
             flash(f'Fehler: {str(e)}', 'danger')
-
-    if request.method == 'GET':
+    elif request.method == 'GET':
         form.team_member_id.data = coaching_to_edit.team_member_id
-        # Populate assignment choices
         form.update_assignment_choices(coaching_to_edit.team_member_id, coaching_to_edit.coach_id)
+    else:
+        # On validation errors, re-populate assignment choices for re-rendering
+        if form.team_member_id.data:
+            form.update_assignment_choices(form.team_member_id.data, current_user.id)
 
     tcap_js = """document.addEventListener('DOMContentLoaded',function(){var s=document.getElementById('coaching_style'),t=document.getElementById('tcap_id_field'),i=document.getElementById('tcap_id');function o(){if(s&&t&&i)if(s.value==='TCAP'){t.style.display='';i.required=!0}else{t.style.display='none';i.required=!1}}s&&t&&i&&(s.addEventListener('change'),o())});"""
     return render_template('main/add_coaching.html',
@@ -1024,7 +1034,7 @@ def get_member_current_score():
     if not member_id:
         return jsonify({'error': 'No member_id'}), 400
     member = TeamMember.query.get_or_404(member_id)
-    coachings = Coaching.query.filter_by(team_member_id=member_id).all()
+    coachings = Coaching.query.filter_by(team_member_id=member.id).all()
     avg_score = 0
     if coachings:
         avg_score = sum(c.overall_score for c in coachings) / len(coachings)
