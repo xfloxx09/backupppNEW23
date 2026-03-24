@@ -899,8 +899,21 @@ def assigned_coachings():
 @login_required
 @role_required([ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_PROJEKTLEITER])
 def create_assigned_coaching():
-    project_filter = get_visible_project_id()
-    form = AssignedCoachingForm(project_id=project_filter)
+    # Get list of project IDs the current user can see
+    if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
+        allowed_project_ids = [p.id for p in Project.query.all()]
+    elif current_user.role == ROLE_ABTEILUNGSLEITER:
+        allowed_project_ids = current_user.get_allowed_project_ids()
+    else:
+        # For PL, they have a single project
+        allowed_project_ids = [current_user.project_id]
+
+    # If a project filter is set in session (active project), use it to restrict further
+    project_filter = session.get('active_project')
+    if project_filter and project_filter in allowed_project_ids:
+        allowed_project_ids = [project_filter]
+
+    form = AssignedCoachingForm(allowed_project_ids=allowed_project_ids)
 
     if form.validate_on_submit():
         member = TeamMember.query.get(form.team_member_id.data)
