@@ -223,16 +223,19 @@ class AssignedCoachingForm(FlaskForm):
         super(AssignedCoachingForm, self).__init__(*args, **kwargs)
         if allowed_project_ids:
             # Coaches: users with roles that can coach and belong to at least one allowed project
-            coach_roles = ['Teamleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Admin', 'Betriebsleiter']
+            # Exclude Admin role (Admins should not be assignable as coaches)
+            coach_roles = ['Teamleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Betriebsleiter']
             coaches = User.query.filter(User.role.in_(coach_roles)).all()
             filtered_coaches = []
             for coach in coaches:
                 if coach.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
-                    # Admins and Betriebsleiter can coach anyone – always include
+                    # Betriebsleiter can be coaches; Admins excluded
+                    if coach.role == ROLE_ADMIN:
+                        continue
+                    # Betriebsleiter can coach anyone – include
                     filtered_coaches.append(coach)
                 elif coach.role == ROLE_TEAMLEITER:
                     # Teamleiter: include if they lead a team in one of the allowed projects
-                    # Use the teams_led relationship
                     led_teams = coach.teams_led.all()
                     if any(team.project_id in allowed_project_ids for team in led_teams):
                         filtered_coaches.append(coach)
@@ -243,9 +246,10 @@ class AssignedCoachingForm(FlaskForm):
             filtered_coaches.sort(key=lambda u: u.username)
             self.coach_id.choices = [(u.id, f"{u.username} ({u.role})") for u in filtered_coaches]
 
-            # Team members: from all allowed projects, excluding archiv
+            # Team members: from all allowed projects, excluding archiv, grouped by team
+            # We'll fetch the members but the template will handle grouping via <optgroup>
             members = TeamMember.query.join(Team, TeamMember.team_id == Team.id).filter(
                 Team.project_id.in_(allowed_project_ids),
                 Team.name != ARCHIV_TEAM_NAME
-            ).order_by(TeamMember.name).all()
+            ).order_by(Team.name, TeamMember.name).all()
             self.team_member_id.choices = [(m.id, f"{m.name} ({m.team.name})") for m in members]
