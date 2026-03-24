@@ -875,9 +875,54 @@ def assigned_coachings():
             query = AssignedCoaching.query.filter_by(project_leader_id=current_user.id)
         if project_filter:
             query = query.join(AssignedCoaching.team_member).join(TeamMember.team).filter(Team.project_id == project_filter)
+        
+        # --- Fetch member performance data for quick overview (only for PL) ---
+        # Get allowed project IDs
+        if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
+            allowed_project_ids = [p.id for p in Project.query.all()]
+        elif current_user.role == ROLE_ABTEILUNGSLEITER:
+            allowed_project_ids = current_user.get_allowed_project_ids()
+        else:
+            allowed_project_ids = [current_user.project_id]
+        
+        # If project filter is active, restrict to that project
+        if project_filter and project_filter in allowed_project_ids:
+            allowed_project_ids = [project_filter]
+        
+        # Get all members from allowed projects, excluding archiv
+        members = TeamMember.query.join(Team, TeamMember.team_id == Team.id).filter(
+            Team.project_id.in_(allowed_project_ids),
+            Team.name != ARCHIV_TEAM_NAME
+        ).order_by(Team.name, TeamMember.name).all()
+        
+        # Compute performance for each member
+        member_performance = []
+        for member in members:
+            coachings = Coaching.query.filter_by(team_member_id=member.id).all()
+            avg_score = 0
+            coaching_count = len(coachings)
+            if coachings:
+                avg_score = sum(c.overall_score for c in coachings) / coaching_count
+            member_performance.append({
+                'id': member.id,
+                'name': member.name,
+                'team_name': member.team.name,
+                'avg_score': round(avg_score, 2),
+                'coaching_count': coaching_count,
+                'last_coaching_date': coachings[-1].coaching_date if coachings else None
+            })
+        # Sort by avg_score descending
+        member_performance.sort(key=lambda x: x['avg_score'], reverse=True)
+        # Extract top 5 and bottom 5 for chart
+        top_performers = member_performance[:5]
+        bottom_performers = [m for m in member_performance if m['avg_score'] < 80][-5:]  # last 5 below 80, or all if fewer
+        bottom_performers.sort(key=lambda x: x['avg_score'])  # ascending
     else:
         view_type = 'coach'
         query = AssignedCoaching.query.filter_by(coach_id=current_user.id)
+        member_performance = []
+        top_performers = []
+        bottom_performers = []
 
     assignments = query.order_by(AssignedCoaching.deadline.asc(), AssignedCoaching.created_at.desc()).paginate(page=page, per_page=10, error_out=False)
 
@@ -892,6 +937,9 @@ def assigned_coachings():
                            view_type=view_type,
                            all_projects=all_projects,
                            current_project_filter=project_filter if view_type == 'pl' else None,
+                           member_performance=member_performance,
+                           top_performers=top_performers,
+                           bottom_performers=bottom_performers,
                            config=current_app.config)
 
 
@@ -905,7 +953,6 @@ def create_assigned_coaching():
     elif current_user.role == ROLE_ABTEILUNGSLEITER:
         allowed_project_ids = current_user.get_allowed_project_ids()
     else:
-        # For PL, they have a single project
         allowed_project_ids = [current_user.project_id]
 
     # If a project filter is set in session (active project), use it to restrict further
@@ -914,6 +961,14 @@ def create_assigned_coaching():
         allowed_project_ids = [project_filter]
 
     form = AssignedCoachingForm(allowed_project_ids=allowed_project_ids)
+
+    # Pre-select member if member_id is in URL
+    pre_select_member_id = request.args.get('member_id', type=int)
+    if pre_select_member_id and request.method == 'GET':
+        # Check if the member is in allowed projects
+        member = TeamMember.query.get(pre_select_member_id)
+        if member and member.team.project_id in allowed_project_ids:
+            form.team_member_id.data = pre_select_member_id
 
     if form.validate_on_submit():
         member = TeamMember.query.get(form.team_member_id.data)
