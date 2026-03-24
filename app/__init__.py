@@ -125,13 +125,14 @@ def create_app(config_class=Config):
         if rows:
             print(f"ℹ️ {len(rows)} zusätzliche Abteilungsleiter-Zuordnungen in user_projects nachgetragen.")
 
-        # ========== NEW: assigned_coachings table ==========
+        # ========== assigned_coachings table ==========
         # 6. Create assigned_coachings table if not exists
         if 'assigned_coachings' not in inspector.get_table_names():
             print("⚠️ Tabelle 'assigned_coachings' fehlt – wird erstellt...")
+            # Use SERIAL for auto-increment id
             conn.execute(text('''
                 CREATE TABLE assigned_coachings (
-                    id INTEGER NOT NULL,
+                    id SERIAL NOT NULL,
                     project_leader_id INTEGER NOT NULL,
                     coach_id INTEGER NOT NULL,
                     team_member_id INTEGER NOT NULL,
@@ -156,6 +157,25 @@ def create_app(config_class=Config):
             conn.commit()
         else:
             print("✅ Tabelle 'assigned_coachings' existiert bereits.")
+            # Ensure id column has auto-increment (if table was created without SERIAL)
+            # Check if id column uses a sequence
+            # We'll attempt to add a sequence and set default if needed
+            # This is idempotent and safe for existing tables
+            conn.execute(text('''
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='assigned_coachings' AND column_name='id' 
+                                   AND column_default IS NOT NULL AND column_default LIKE 'nextval%') THEN
+                        CREATE SEQUENCE IF NOT EXISTS assigned_coachings_id_seq;
+                        ALTER TABLE assigned_coachings ALTER COLUMN id SET DEFAULT nextval('assigned_coachings_id_seq');
+                        PERFORM setval('assigned_coachings_id_seq', COALESCE((SELECT MAX(id) FROM assigned_coachings), 1));
+                    END IF;
+                END
+                $$;
+            '''))
+            conn.commit()
+            print("✅ Auto-increment für assigned_coachings.id sichergestellt.")
 
         # 7. Add assigned_coaching_id to coachings table if not exists
         columns_coachings = [col['name'] for col in inspector.get_columns('coachings')]
