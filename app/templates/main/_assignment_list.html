@@ -48,7 +48,7 @@
             <div class="table-responsive">
                 <table class="table table-striped table-hover">
                     <thead>
-                         …
+                        <tr>
                             <th>
                                 Deadline
                                 <a href="{{ url_for('main.assigned_coachings', status=status_filter, team=team_filter, coach=coach_filter, member=member_filter, search=search_term, sort_by='deadline', sort_dir='asc' if sort_by != 'deadline' or sort_dir == 'desc' else 'desc') }}" class="sort-link">
@@ -71,10 +71,11 @@
                             <th>Fortschritt</th>
                             <th>Status</th>
                             <th>Aktionen</th>
-                         </thead>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for assignment in assignments.items %}
-                         …
+                        <tr>
                             <td>{{ assignment.deadline|athens_time('%d.%m.%Y %H:%M') }}</td>
                             <td>{{ assignment.team_member.name }} ({{ assignment.team_member.team.name }})</td>
                             <td>{{ assignment.coach.username }}</td>
@@ -109,7 +110,7 @@
                                     <a href="{{ url_for('main.assigned_coaching_report', assignment_id=assignment.id) }}" class="btn btn-sm btn-info">Bericht</a>
                                 {% endif %}
                             </td>
-                         </tr>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
