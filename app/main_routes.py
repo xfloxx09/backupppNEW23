@@ -1013,7 +1013,11 @@ def assigned_coachings():
         coaches_q = User.query.filter(User.role.in_(['Teamleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Betriebsleiter'])).order_by(User.username)
         all_coaches = coaches_q.all()
         
-        members_q = TeamMember.query.join(Team).filter(Team.project_id.in_(project_ids), Team.name != ARCHIV_TEAM_NAME).order_by(TeamMember.name)
+        # Explicit join on team_id to avoid ambiguous foreign key
+        members_q = TeamMember.query.join(Team, TeamMember.team_id == Team.id).filter(
+            Team.project_id.in_(project_ids),
+            Team.name != ARCHIV_TEAM_NAME
+        ).order_by(TeamMember.name)
         all_members = members_q.all()
     
     all_projects = []
