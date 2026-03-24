@@ -30,6 +30,7 @@
     .status-completed { background-color: #28a745; color: white; }
     .status-expired { background-color: #6c757d; color: white; }
     .status-rejected { background-color: #dc3545; color: white; }
+    .status-cancelled { background-color: #6c757d; color: white; }
     .progress {
         background-color: #5a6268;
         height: 10px;
@@ -71,7 +72,7 @@
                     </div>
                     <div>
                         <span class="assignment-status status-{{ assignment.status }}">{{ assignment.status|replace('_',' ') }}</span>
-                        {% if assignment.is_overdue and assignment.status not in ['completed','expired'] %}
+                        {% if assignment.is_overdue and assignment.status not in ['completed','expired','cancelled'] %}
                             <span class="deadline-overdue ml-2">Überfällig!</span>
                         {% endif %}
                     </div>
@@ -93,6 +94,11 @@
                         </form>
                         <form action="{{ url_for('main.reject_assigned_coaching', assignment_id=assignment.id) }}" method="POST" style="display: inline;">
                             <button type="submit" class="btn btn-sm btn-danger">Ablehnen</button>
+                        </form>
+                    {% endif %}
+                    {% if view_type == 'pl' and assignment.status in ['pending', 'accepted', 'in_progress'] %}
+                        <form action="{{ url_for('main.cancel_assigned_coaching', assignment_id=assignment.id) }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Möchten Sie diese Coaching-Aufgabe wirklich stornieren?')">Stornieren</button>
                         </form>
                     {% endif %}
                     {% if view_type == 'pl' and assignment.status == 'completed' %}
