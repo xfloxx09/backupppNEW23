@@ -866,7 +866,29 @@ def pl_qm_dashboard():
 def assigned_coachings():
     page = request.args.get('page', 1, type=int)
     project_filter = get_visible_project_id()
-
+    
+    # Get filter parameters for assignments
+    status_filter = request.args.get('status', 'current')  # 'current' or 'completed'
+    team_filter = request.args.get('team', type=int)
+    coach_filter = request.args.get('coach', type=int)
+    member_filter = request.args.get('member', type=int)
+    search_term = request.args.get('search', default="", type=str).strip()
+    sort_by = request.args.get('sort_by', 'deadline')
+    sort_dir = request.args.get('sort_dir', 'asc')
+    
+    # Define status groups
+    current_statuses = ['pending', 'accepted', 'in_progress']
+    completed_statuses = ['completed', 'expired', 'cancelled', 'rejected']
+    
+    # Determine which statuses to show based on tab
+    if status_filter == 'current':
+        statuses_to_show = current_statuses
+        tab_active = 'current'
+    else:
+        statuses_to_show = completed_statuses
+        tab_active = 'completed'
+    
+    # Build base query
     if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_PROJEKTLEITER]:
         view_type = 'pl'
         if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
@@ -911,27 +933,95 @@ def assigned_coachings():
                 'coaching_count': coaching_count,
                 'last_coaching_date': coachings[-1].coaching_date if coachings else None
             })
-        # Sort by avg_score descending
-        member_performance.sort(key=lambda x: x['avg_score'], reverse=True)
-        # Extract top 5 and bottom 5 for chart
-        top_performers = member_performance[:5]
-        bottom_performers = [m for m in member_performance if m['avg_score'] < 80][-5:]  # last 5 below 80, or all if fewer
-        bottom_performers.sort(key=lambda x: x['avg_score'])  # ascending
+        # Sort by avg_score descending for later use
+        member_performance_sorted = sorted(member_performance, key=lambda x: x['avg_score'], reverse=True)
+        top_performers = member_performance_sorted[:5]
+        bottom_performers = [m for m in member_performance_sorted if m['avg_score'] < 80][-5:]
+        bottom_performers.sort(key=lambda x: x['avg_score'])
     else:
         view_type = 'coach'
         query = AssignedCoaching.query.filter_by(coach_id=current_user.id)
         member_performance = []
         top_performers = []
         bottom_performers = []
-
-    assignments = query.order_by(AssignedCoaching.deadline.asc(), AssignedCoaching.created_at.desc()).paginate(page=page, per_page=10, error_out=False)
-
+    
+    # Apply status filter
+    query = query.filter(AssignedCoaching.status.in_(statuses_to_show))
+    
+    # Apply additional filters
+    if team_filter:
+        query = query.join(AssignedCoaching.team_member).join(TeamMember.team).filter(Team.id == team_filter)
+    if coach_filter:
+        query = query.filter(AssignedCoaching.coach_id == coach_filter)
+    if member_filter:
+        query = query.filter(AssignedCoaching.team_member_id == member_filter)
+    if search_term:
+        search_pattern = f"%{search_term}%"
+        # Need to join member and coach for search
+        if 'team_member' not in str(query):
+            query = query.join(AssignedCoaching.team_member)
+        if 'coach' not in str(query):
+            query = query.join(User, AssignedCoaching.coach_id == User.id)
+        query = query.filter(
+            or_(
+                TeamMember.name.ilike(search_pattern),
+                User.username.ilike(search_pattern),
+                AssignedCoaching.status.ilike(search_pattern)
+            )
+        )
+    
+    # Apply sorting
+    sort_column = {
+        'deadline': AssignedCoaching.deadline,
+        'member_name': TeamMember.name,
+        'coach_name': User.username,
+        'progress': AssignedCoaching.expected_coaching_count,
+        'expected_count': AssignedCoaching.expected_coaching_count
+    }.get(sort_by, AssignedCoaching.deadline)
+    
+    # For member and coach names we need to join
+    if sort_by in ['member_name', 'coach_name']:
+        if 'team_member' not in str(query):
+            query = query.join(AssignedCoaching.team_member)
+        if sort_by == 'coach_name' and 'coach' not in str(query):
+            query = query.join(User, AssignedCoaching.coach_id == User.id)
+    
+    if sort_dir == 'asc':
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+    
+    assignments = query.paginate(page=page, per_page=10, error_out=False)
+    
+    # Prepare filter dropdowns
+    all_teams = []
+    all_coaches = []
+    all_members = []
+    if view_type == 'pl':
+        # Get allowed projects for filter options
+        if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
+            project_ids = [p.id for p in Project.query.all()]
+        elif current_user.role == ROLE_ABTEILUNGSLEITER:
+            project_ids = current_user.get_allowed_project_ids()
+        else:
+            project_ids = [current_user.project_id]
+        
+        # Fetch teams, coaches, members from allowed projects
+        teams_q = Team.query.filter(Team.project_id.in_(project_ids), Team.name != ARCHIV_TEAM_NAME).order_by(Team.name)
+        all_teams = teams_q.all()
+        
+        coaches_q = User.query.filter(User.role.in_(['Teamleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Betriebsleiter'])).order_by(User.username)
+        all_coaches = coaches_q.all()
+        
+        members_q = TeamMember.query.join(Team).filter(Team.project_id.in_(project_ids), Team.name != ARCHIV_TEAM_NAME).order_by(TeamMember.name)
+        all_members = members_q.all()
+    
     all_projects = []
     if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
         all_projects = Project.query.order_by(Project.name).all()
     elif current_user.role == ROLE_ABTEILUNGSLEITER:
         all_projects = current_user.projects.order_by(Project.name).all()
-
+    
     return render_template('main/assigned_coachings.html',
                            assignments=assignments,
                            view_type=view_type,
@@ -940,6 +1030,17 @@ def assigned_coachings():
                            member_performance=member_performance,
                            top_performers=top_performers,
                            bottom_performers=bottom_performers,
+                           tab_active=tab_active,
+                           status_filter=status_filter,
+                           team_filter=team_filter,
+                           coach_filter=coach_filter,
+                           member_filter=member_filter,
+                           search_term=search_term,
+                           sort_by=sort_by,
+                           sort_dir=sort_dir,
+                           all_teams=all_teams,
+                           all_coaches=all_coaches,
+                           all_members=all_members,
                            config=current_app.config)
 
 
