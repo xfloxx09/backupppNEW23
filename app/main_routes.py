@@ -1035,45 +1035,50 @@ def available_assignments():
 @bp.route('/api/coach_team_members/<int:coach_id>', methods=['GET'])
 @login_required
 def api_coach_team_members(coach_id):
-    coach = User.query.get_or_404(coach_id)
-    project_filter = request.args.get('project', type=int)
-    
-    # Determine which team members this coach can coach
-    if coach.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
-        # Admin/Betriebsleiter can coach any member in the project (if project filter active)
-        query = TeamMember.query.join(Team)
-        if project_filter:
-            query = query.filter(Team.project_id == project_filter)
-        query = query.filter(Team.name != ARCHIV_TEAM_NAME)
-    elif coach.role == ROLE_ABTEILUNGSLEITER:
-        # Abteilungsleiter can coach members in projects they are assigned to
-        allowed_project_ids = coach.get_allowed_project_ids()
-        if project_filter and project_filter in allowed_project_ids:
-            allowed_project_ids = [project_filter]
-        query = TeamMember.query.join(Team).filter(Team.project_id.in_(allowed_project_ids), Team.name != ARCHIV_TEAM_NAME)
-    elif coach.role == ROLE_TEAMLEITER:
-        # Teamleiter can coach members of teams they lead
-        led_team_ids = [team.id for team in coach.teams_led]
-        if not led_team_ids:
-            return jsonify([])
-        query = TeamMember.query.filter(TeamMember.team_id.in_(led_team_ids)).join(Team).filter(Team.name != ARCHIV_TEAM_NAME)
-        if project_filter:
-            # Also filter by project if PL has one selected
-            query = query.filter(Team.project_id == project_filter)
-    else:
-        # Other coaches (QM, SalesCoach, Trainer) – they are associated with a project via their project_id
-        # They can coach any member in that project (or in the PL's selected project if same)
-        if coach.project_id:
-            query = TeamMember.query.join(Team).filter(Team.project_id == coach.project_id, Team.name != ARCHIV_TEAM_NAME)
-            if project_filter and project_filter != coach.project_id:
-                # If PL's project doesn't match coach's project, return empty (they can't coach outside their project)
-                query = query.filter(false())
+    try:
+        coach = User.query.get_or_404(coach_id)
+        project_filter = request.args.get('project', type=int)
+
+        # Determine which team members this coach can coach
+        if coach.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
+            # Admin/Betriebsleiter can coach any member in the project (if project filter active)
+            query = TeamMember.query.join(Team)
+            if project_filter:
+                query = query.filter(Team.project_id == project_filter)
+            query = query.filter(Team.name != ARCHIV_TEAM_NAME)
+        elif coach.role == ROLE_ABTEILUNGSLEITER:
+            # Abteilungsleiter can coach members in projects they are assigned to
+            allowed_project_ids = coach.get_allowed_project_ids()
+            if project_filter and project_filter in allowed_project_ids:
+                allowed_project_ids = [project_filter]
+            if not allowed_project_ids:
+                return jsonify([])
+            query = TeamMember.query.join(Team).filter(Team.project_id.in_(allowed_project_ids), Team.name != ARCHIV_TEAM_NAME)
+        elif coach.role == ROLE_TEAMLEITER:
+            # Teamleiter can coach members of teams they lead
+            led_team_ids = [team.id for team in coach.teams_led]
+            if not led_team_ids:
+                return jsonify([])
+            query = TeamMember.query.filter(TeamMember.team_id.in_(led_team_ids)).join(Team).filter(Team.name != ARCHIV_TEAM_NAME)
+            if project_filter:
+                # Also filter by project if PL has one selected
+                query = query.filter(Team.project_id == project_filter)
         else:
-            query = TeamMember.query.filter(false())
-    
-    members = query.order_by(TeamMember.name).all()
-    member_list = [{'id': m.id, 'name': m.name, 'team_name': m.team.name} for m in members]
-    return jsonify(member_list)
+            # Other coaches (QM, SalesCoach, Trainer) – they are associated with a project via their project_id
+            if coach.project_id:
+                query = TeamMember.query.join(Team).filter(Team.project_id == coach.project_id, Team.name != ARCHIV_TEAM_NAME)
+                if project_filter and project_filter != coach.project_id:
+                    # If PL's project doesn't match coach's project, return empty (they can't coach outside their project)
+                    return jsonify([])
+            else:
+                return jsonify([])
+
+        members = query.order_by(TeamMember.name).all()
+        member_list = [{'id': m.id, 'name': m.name, 'team_name': m.team.name} for m in members]
+        return jsonify(member_list)
+    except Exception as e:
+        current_app.logger.error(f"Error in api_coach_team_members: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 @bp.route('/api/member_current_score', methods=['GET'])
