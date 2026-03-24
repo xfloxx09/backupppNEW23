@@ -917,27 +917,47 @@ def assigned_coachings():
             Team.name != ARCHIV_TEAM_NAME
         ).order_by(Team.name, TeamMember.name).all()
         
-        # Compute performance for each member
+        # Compute performance for each member with combined score
         member_performance = []
+        all_scores = []
         for member in members:
             coachings = Coaching.query.filter_by(team_member_id=member.id).all()
             avg_score = 0
             coaching_count = len(coachings)
+            total_time = 0
             if coachings:
                 avg_score = sum(c.overall_score for c in coachings) / coaching_count
+                total_time = sum(c.time_spent for c in coachings)
             member_performance.append({
                 'id': member.id,
                 'name': member.name,
                 'team_name': member.team.name,
                 'avg_score': round(avg_score, 2),
                 'coaching_count': coaching_count,
+                'total_time': total_time,
                 'last_coaching_date': coachings[-1].coaching_date if coachings else None
             })
-        # Sort by avg_score descending for later use
-        member_performance_sorted = sorted(member_performance, key=lambda x: x['avg_score'], reverse=True)
+            all_scores.append(avg_score)
+        
+        # Calculate combined score (weighted: 40% performance, 30% coaching count, 30% total time)
+        # Normalize each metric to 0-100
+        if member_performance:
+            max_avg_score = max(m['avg_score'] for m in member_performance) or 1
+            max_coaching_count = max(m['coaching_count'] for m in member_performance) or 1
+            max_total_time = max(m['total_time'] for m in member_performance) or 1
+            
+            for m in member_performance:
+                norm_score = (m['avg_score'] / max_avg_score) * 100 if max_avg_score else 0
+                norm_count = (m['coaching_count'] / max_coaching_count) * 100 if max_coaching_count else 0
+                norm_time = (m['total_time'] / max_total_time) * 100 if max_total_time else 0
+                combined = (norm_score * 0.4) + (norm_count * 0.3) + (norm_time * 0.3)
+                m['combined_score'] = round(combined, 2)
+        
+        # Sort by combined_score descending for later use
+        member_performance_sorted = sorted(member_performance, key=lambda x: x.get('combined_score', 0), reverse=True)
         top_performers = member_performance_sorted[:5]
-        bottom_performers = [m for m in member_performance_sorted if m['avg_score'] < 80][-5:]
-        bottom_performers.sort(key=lambda x: x['avg_score'])
+        bottom_performers = member_performance_sorted[-5:] if len(member_performance_sorted) >= 5 else member_performance_sorted
+        bottom_performers.sort(key=lambda x: x.get('combined_score', 0))
     else:
         view_type = 'coach'
         query = AssignedCoaching.query.filter_by(coach_id=current_user.id)
@@ -957,7 +977,6 @@ def assigned_coachings():
         query = query.filter(AssignedCoaching.team_member_id == member_filter)
     if search_term:
         search_pattern = f"%{search_term}%"
-        # Need to join member and coach for search
         if 'team_member' not in str(query):
             query = query.join(AssignedCoaching.team_member)
         if 'coach' not in str(query):
@@ -979,7 +998,6 @@ def assigned_coachings():
         'expected_count': AssignedCoaching.expected_coaching_count
     }.get(sort_by, AssignedCoaching.deadline)
     
-    # For member and coach names we need to join
     if sort_by in ['member_name', 'coach_name']:
         if 'team_member' not in str(query):
             query = query.join(AssignedCoaching.team_member)
@@ -998,7 +1016,6 @@ def assigned_coachings():
     all_coaches = []
     all_members = []
     if view_type == 'pl':
-        # Get allowed projects for filter options
         if current_user.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
             project_ids = [p.id for p in Project.query.all()]
         elif current_user.role == ROLE_ABTEILUNGSLEITER:
@@ -1006,14 +1023,12 @@ def assigned_coachings():
         else:
             project_ids = [current_user.project_id]
         
-        # Fetch teams, coaches, members from allowed projects
         teams_q = Team.query.filter(Team.project_id.in_(project_ids), Team.name != ARCHIV_TEAM_NAME).order_by(Team.name)
         all_teams = teams_q.all()
         
         coaches_q = User.query.filter(User.role.in_(['Teamleiter', 'Qualitätsmanager', 'SalesCoach', 'Trainer', 'Betriebsleiter'])).order_by(User.username)
         all_coaches = coaches_q.all()
         
-        # Explicit join on team_id to avoid ambiguous foreign key
         members_q = TeamMember.query.join(Team, TeamMember.team_id == Team.id).filter(
             Team.project_id.in_(project_ids),
             Team.name != ARCHIV_TEAM_NAME
