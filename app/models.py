@@ -29,7 +29,7 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.utcnow())
 
     users = db.relationship('User', backref='project_ref', lazy='dynamic')
     teams = db.relationship('Team', backref='project_ref', lazy='dynamic')
@@ -128,7 +128,7 @@ class Coaching(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     team_member_id = db.Column(db.Integer, db.ForeignKey('team_members.id', name='fk_coaching_team_member_id'), nullable=False)
     coach_id = db.Column(db.Integer, db.ForeignKey('users.id', name='fk_coaching_coach_id'), nullable=False)
-    coaching_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    coaching_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.utcnow())
     coaching_style = db.Column(db.String(50), nullable=True)
     tcap_id = db.Column(db.String(50), nullable=True)
     coaching_subject = db.Column(db.String(50), nullable=True)
@@ -213,7 +213,7 @@ class Workshop(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     coach_id = db.Column(db.Integer, db.ForeignKey('users.id', name='fk_workshop_coach_id'), nullable=False)
-    workshop_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    workshop_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.utcnow())
     overall_rating = db.Column(db.Integer, nullable=True)
     time_spent = db.Column(db.Integer, nullable=True)
     notes = db.Column(db.Text, nullable=True)
@@ -234,8 +234,8 @@ class AssignedCoaching(db.Model):
     desired_performance_note = db.Column(db.Integer, nullable=True)
     current_performance_note_at_assign = db.Column(db.Float, nullable=True)
     status = db.Column(db.String(20), nullable=False, default='pending')
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.utcnow())
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
     project_leader = db.relationship('User', foreign_keys=[project_leader_id], backref='assigned_coachings_as_pl')
     coach = db.relationship('User', foreign_keys=[coach_id], backref='assigned_coachings_as_coach')
@@ -251,7 +251,8 @@ class AssignedCoaching(db.Model):
 
     @property
     def is_overdue(self):
-        return datetime.now(timezone.utc) > self.deadline and self.status not in ['completed', 'expired']
+        # Use naive UTC datetime to compare with deadline (which is stored as naive)
+        return datetime.utcnow() > self.deadline and self.status not in ['completed', 'expired']
 
     def __repr__(self):
         return f'<AssignedCoaching {self.id} to {self.coach.username} for {self.team_member.name}>'
