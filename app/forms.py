@@ -1,6 +1,6 @@
 # app/forms.py
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, SelectMultipleField, IntegerField, TextAreaField, DateTimeField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, SelectField, SelectMultipleField, IntegerField, TextAreaField, DateField
 from wtforms.validators import DataRequired, EqualTo, ValidationError, Length, NumberRange, Optional
 from app.models import User, Team, TeamMember, Project
 from app.utils import ARCHIV_TEAM_NAME, ROLE_TEAMLEITER, ROLE_ADMIN, ROLE_BETRIEBSLEITER, ROLE_ABTEILUNGSLEITER
@@ -214,7 +214,7 @@ class ProjectForm(FlaskForm):
 class AssignedCoachingForm(FlaskForm):
     coach_id = SelectField('Coach', coerce=int, validators=[DataRequired("Coach ist erforderlich.")], choices=[])
     team_member_id = SelectField('Teammitglied', coerce=int, validators=[DataRequired("Teammitglied ist erforderlich.")], choices=[])
-    deadline = DateTimeField('Deadline', format='%Y-%m-%d %H:%M', validators=[DataRequired("Deadline ist erforderlich.")])
+    deadline = DateField('Deadline', format='%Y-%m-%d', validators=[DataRequired("Deadline ist erforderlich.")])
     expected_coaching_count = IntegerField('Anzahl erwarteter Coachings', validators=[DataRequired("Anzahl ist erforderlich."), NumberRange(min=1, max=50)], default=1)
     desired_performance_note = IntegerField('Gewünschte Performance Note (0-10)', validators=[Optional(), NumberRange(min=0, max=10)], default=None)
     submit = SubmitField('Coaching zuweisen')
