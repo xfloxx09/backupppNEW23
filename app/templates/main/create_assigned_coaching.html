@@ -51,11 +51,11 @@ $(document).ready(function() {
 
                     <div class="form-group">
                         {{ form.deadline.label(class="form-control-label") }}
-                        {{ form.deadline(class="form-control " + ("is-invalid" if form.deadline.errors else ""), placeholder="YYYY-MM-DD HH:MM") }}
+                        {{ form.deadline(class="form-control " + ("is-invalid" if form.deadline.errors else ""), type="date") }}
                         {% if form.deadline.errors %}
                             <div class="invalid-feedback">{% for error in form.deadline.errors %}{{ error }}{% endfor %}</div>
                         {% endif %}
-                        <small class="form-text text-muted">Format: Jahr-Monat-Tag Stunde:Minute (z.B. 2026-12-31 23:59)</small>
+                        <small class="form-text text-muted">Wählen Sie ein Datum. Die Deadline endet um 23:59 Uhr.</small>
                     </div>
 
                     <div class="form-group">
