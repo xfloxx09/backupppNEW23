@@ -358,7 +358,6 @@ def add_coaching():
 
     form.update_team_member_choices(exclude_archiv=True, project_id=selected_project_id)
 
-    # --- Pre-populate assignment choices on POST before validation ---
     if request.method == 'POST':
         team_member_id = request.form.get('team_member_id', type=int)
         if team_member_id:
@@ -404,7 +403,6 @@ def add_coaching():
             current_app.logger.error(f"Add coaching error: {e}")
             flash(f'Fehler: {str(e)}', 'danger')
     elif request.method == 'POST':
-        # On POST with validation errors, re-populate assignment choices for re-rendering
         if form.team_member_id.data:
             form.update_assignment_choices(form.team_member_id.data, current_user.id)
         for field, errors in form.errors.items():
@@ -651,7 +649,6 @@ def edit_coaching(coaching_id):
     form = CoachingForm(obj=coaching_to_edit, current_user_role=current_user.role, current_user_team_ids=user_team_ids)
     form.update_team_member_choices(exclude_archiv=False, project_id=coaching_to_edit.project_id)
 
-    # --- Pre-populate assignment choices on POST before validation ---
     if request.method == 'POST':
         team_member_id = request.form.get('team_member_id', type=int)
         if team_member_id:
@@ -675,7 +672,6 @@ def edit_coaching(coaching_id):
         form.team_member_id.data = coaching_to_edit.team_member_id
         form.update_assignment_choices(coaching_to_edit.team_member_id, coaching_to_edit.coach_id)
     else:
-        # On validation errors, re-populate assignment choices for re-rendering
         if form.team_member_id.data:
             form.update_assignment_choices(form.team_member_id.data, current_user.id)
 
@@ -909,7 +905,6 @@ def create_assigned_coaching():
         if member_coachings:
             current_avg_score = sum(c.overall_score for c in member_coachings) / len(member_coachings)
 
-        # Convert date to datetime at end of day
         deadline_date = form.deadline.data
         deadline_datetime = datetime.combine(deadline_date, time(23, 59, 59))
 
@@ -1040,33 +1035,27 @@ def api_coach_team_members(coach_id):
     
     # Determine which team members this coach can coach
     if coach.role in [ROLE_ADMIN, ROLE_BETRIEBSLEITER]:
-        # Admin/Betriebsleiter can coach any member in the project (if project filter active)
         query = TeamMember.query.join(Team)
         if project_filter:
             query = query.filter(Team.project_id == project_filter)
         query = query.filter(Team.name != ARCHIV_TEAM_NAME)
     elif coach.role == ROLE_ABTEILUNGSLEITER:
-        # Abteilungsleiter can coach members in projects they are assigned to
         allowed_project_ids = coach.get_allowed_project_ids()
         if project_filter and project_filter in allowed_project_ids:
             allowed_project_ids = [project_filter]
         query = TeamMember.query.join(Team).filter(Team.project_id.in_(allowed_project_ids), Team.name != ARCHIV_TEAM_NAME)
     elif coach.role == ROLE_TEAMLEITER:
-        # Teamleiter can coach members of teams they lead
         led_team_ids = [team.id for team in coach.teams_led]
         if not led_team_ids:
             return jsonify([])
         query = TeamMember.query.filter(TeamMember.team_id.in_(led_team_ids)).join(Team).filter(Team.name != ARCHIV_TEAM_NAME)
         if project_filter:
-            # Also filter by project if PL has one selected
             query = query.filter(Team.project_id == project_filter)
     else:
         # Other coaches (QM, SalesCoach, Trainer) – they are associated with a project via their project_id
-        # They can coach any member in that project (or in the PL's selected project if same)
         if coach.project_id:
             query = TeamMember.query.join(Team).filter(Team.project_id == coach.project_id, Team.name != ARCHIV_TEAM_NAME)
             if project_filter and project_filter != coach.project_id:
-                # If PL's project doesn't match coach's project, return empty (they can't coach outside their project)
                 query = query.filter(false())
         else:
             query = TeamMember.query.filter(false())
